@@ -60,9 +60,9 @@ func NewErrorTrace(skip int, args ...interface{}) error {
 
 	formatstring := ""
 	for i := len(args); i >= 1; i-- {
-		formatstring += " |%+v|"
+		formatstring += "|%+v| "
 	}
-	formatstring += "\n  "
+	formatstring += "\n"
 
 	if len(formatstring) != 0 {
 		buf.WriteString(fmt.Sprintf(formatstring, args...))

@@ -21,22 +21,23 @@ func getDurationUpTo(rows []*Row, index int) time.Duration {
 }
 
 func TestFixupSubTime(t *testing.T) {
+	now := time.Now().UTC().Round(time.Second)
 	data := []*Row{
 		{
-			Starttimestamp: time.Now().Add(-(time.Hour * 24 * 7 * 2)),
-			Endtimestamp:   time.Now().Add(-(time.Hour * 24 * 7 * 2)).AddDate(0, 1, 0),
+			Starttimestamp: now.Add(-(time.Hour * 24 * 7 * 2)),
+			Endtimestamp:   now.Add(-(time.Hour * 24 * 7 * 2)).AddDate(0, 1, 0),
 		},
 		{
-			Starttimestamp: time.Now(),
-			Endtimestamp:   time.Now().AddDate(0, 1, 0),
+			Starttimestamp: now,
+			Endtimestamp:   now.AddDate(0, 1, 0),
 		},
 		{
-			Starttimestamp: time.Now().AddDate(0, 1, 0),
-			Endtimestamp:   time.Now().AddDate(0, 2, 0),
+			Starttimestamp: now.AddDate(0, 1, 0),
+			Endtimestamp:   now.AddDate(0, 2, 0),
 		},
 		{
-			Starttimestamp: time.Now().AddDate(0, 2, 0),
-			Endtimestamp:   time.Now().AddDate(0, 3, 0),
+			Starttimestamp: now.AddDate(0, 2, 0),
+			Endtimestamp:   now.AddDate(0, 3, 0),
 		},
 	}
 	expected := []time.Time{
@@ -55,20 +56,20 @@ func TestFixupSubTime(t *testing.T) {
 
 	data = []*Row{
 		{
-			Starttimestamp: time.Now().Add(-(time.Hour * 24 * 7 * 2)),
-			Endtimestamp:   time.Now().Add(-(time.Hour * 24 * 7 * 2)).AddDate(0, 1, 0),
+			Starttimestamp: now.Add(-(time.Hour * 24 * 7 * 2)),
+			Endtimestamp:   now.Add(-(time.Hour * 24 * 7 * 2)).AddDate(0, 1, 0),
 		},
 		{
-			Starttimestamp: time.Now().AddDate(0, 1, 0),
-			Endtimestamp:   time.Now().AddDate(0, 2, 0),
+			Starttimestamp: now.AddDate(0, 1, 0),
+			Endtimestamp:   now.AddDate(0, 2, 0),
 		},
 		{
-			Starttimestamp: time.Now().AddDate(0, 2, 0),
-			Endtimestamp:   time.Now().AddDate(0, 3, 0),
+			Starttimestamp: now.AddDate(0, 2, 0),
+			Endtimestamp:   now.AddDate(0, 3, 0),
 		},
 		{
-			Starttimestamp: time.Now(),
-			Endtimestamp:   time.Now().AddDate(0, 1, 0),
+			Starttimestamp: now,
+			Endtimestamp:   now.AddDate(0, 1, 0),
 		},
 	}
 	expected = []time.Time{

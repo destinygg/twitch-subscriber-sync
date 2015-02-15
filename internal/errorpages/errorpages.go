@@ -19,6 +19,6 @@ func Recover(reason interface{}, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusInternalServerError)
 
-	err := d.NewErrorTrace(4, reason)
+	err := d.NewErrorTrace(5, reason)
 	fmt.Fprint(w, err.Error())
 }

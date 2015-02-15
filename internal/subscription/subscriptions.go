@@ -117,7 +117,15 @@ func Add(r *http.Request, row *Row) {
 	}
 }
 
-func getActiveSubs(tx *sql.Tx, userid int64) []*Row {
+func getActiveSubs(tx *sql.Tx, userid int64) (rows []*Row) {
+	var err error
+	defer (func() {
+		if err != nil {
+			tx.Rollback()
+			d.F("err: %v targetuserid: %+v", err, userid)
+		}
+	})()
+
 	cursor, err := tx.Query(`
 		SELECT
 			id,
@@ -130,21 +138,22 @@ func getActiveSubs(tx *sql.Tx, userid int64) []*Row {
 			timestamp
 		FROM subscriptions
 		WHERE
-			userid          = ? AND
-			starttimestamp <= NOW() AND
-			endtimestamp   >= NOW()
+			targetuserid  = ? AND
+			endtimestamp >= NOW()
 		ORDER BY starttimestamp
 	`, userid)
 	if err != nil {
-		tx.Rollback()
-		d.F("err: %v targetuserid: %+v", err, userid)
+		return
 	}
 	defer cursor.Close()
 
-	var rows []*Row
 	for cursor.Next() {
-		var row *Row
-		err := cursor.Scan(
+		if err = cursor.Err(); err != nil {
+			return
+		}
+
+		var row Row
+		err = cursor.Scan(
 			&row.ID,
 			&row.Donationid,
 			&row.Fromuserid,
@@ -154,13 +163,11 @@ func getActiveSubs(tx *sql.Tx, userid int64) []*Row {
 			&row.Endtimestamp,
 			&row.Timestamp,
 		)
-
 		if err != nil {
-			tx.Rollback()
-			panic(err.Error())
+			return
 		}
 
-		rows = append(rows, row)
+		rows = append(rows, &row)
 	}
 
 	return rows
@@ -187,7 +194,14 @@ func assembleSubs(rows []*Row, row *Row) []*Row {
 
 func fixupSubTime(rows []*Row) {
 	durations := make([]time.Duration, 0, len(rows))
+	now := time.Now().UTC().Round(time.Second)
 	for _, v := range rows {
+		// if the subscription is in the past, that means some time has to be
+		// deducted from it since it has been used
+		if v.Starttimestamp.Before(now) {
+			v.Starttimestamp = v.Starttimestamp.Add(now.Sub(v.Starttimestamp)).Round(time.Second)
+		}
+
 		durations = append(durations, v.Endtimestamp.Sub(v.Starttimestamp))
 	}
 
