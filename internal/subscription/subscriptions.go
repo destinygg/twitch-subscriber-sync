@@ -102,10 +102,11 @@ func Add(ctx context.Context, row *Row) {
 	// now update records that have a non-null ID aka where records already exist
 	updateSubs(tx, rows)
 	// and insert the new record
-	_ = insert(tx, row)
+	insert(tx, row)
 
 	err = tx.Commit()
 	if err != nil {
+		tx.Rollback()
 		d.F("err: %v row: %+v", err, row)
 	}
 }
@@ -129,6 +130,7 @@ func getActiveSubs(tx *sql.Tx, userid int64) []*Row {
 		ORDER BY starttimestamp
 	`, userid)
 	if err != nil {
+		tx.Rollback()
 		d.F("err: %v targetuserid: %+v", err, userid)
 	}
 	defer cursor.Close()
@@ -148,6 +150,7 @@ func getActiveSubs(tx *sql.Tx, userid int64) []*Row {
 		)
 
 		if err != nil {
+			tx.Rollback()
 			panic(err.Error())
 		}
 
@@ -182,7 +185,6 @@ func fixupSubTime(rows []*Row) {
 		durations = append(durations, v.Endtimestamp.Sub(v.Starttimestamp))
 	}
 
-	d.P("duration of ")
 	pe := rows[0].Endtimestamp
 	for i, l := 1, len(rows); i < l; i++ {
 		rows[i].Starttimestamp = pe
@@ -201,6 +203,7 @@ func updateSubs(tx *sql.Tx, rows []*Row) {
 		LIMIT 1
 	`)
 	if err != nil {
+		tx.Rollback()
 		panic(err.Error())
 	}
 	defer stmt.Close()
@@ -214,6 +217,7 @@ func updateSubs(tx *sql.Tx, rows []*Row) {
 			)
 
 			if err != nil {
+				tx.Rollback()
 				d.F("err: %v row: %+v", err, v)
 			}
 		}
@@ -242,11 +246,13 @@ func insert(tx *sql.Tx, row *Row) sql.NullInt64 {
 		row.Timestamp,
 	)
 	if err != nil {
+		tx.Rollback()
 		panic(err.Error())
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
+		tx.Rollback()
 		panic(err.Error())
 	}
 
