@@ -1,0 +1,6 @@
+settings.cfg
+*.sublime-*
+deploy.sh
+precommit
+*.pprof
+.state.dc
