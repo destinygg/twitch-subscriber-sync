@@ -51,24 +51,26 @@ func P(args ...interface{}) {
 
 // source https://groups.google.com/forum/?fromgroups#!topic/golang-nuts/C24fRw8HDmI
 // from David Wright
-type errorTrace struct {
-	err   error
-	trace string
+type ErrorTrace struct {
+	trace bytes.Buffer
 }
 
-func newErrorTrace(args ...interface{}) error {
+func NewErrorTrace(skip int, args ...interface{}) error {
+	buf := bytes.Buffer{}
+
 	formatstring := ""
 	for i := len(args); i >= 1; i-- {
 		formatstring += " |%+v|"
 	}
+	formatstring += "\n  "
 
-	msg := fmt.Sprintf(formatstring, args...)
-	buf := bytes.Buffer{}
-	skip := 2
+	if len(formatstring) != 0 {
+		buf.WriteString(fmt.Sprintf(formatstring, args...))
+	}
 
 addtrace:
 	pc, file, line, ok := runtime.Caller(skip)
-	if ok && skip < 6 { // print a max of 6 lines of trace
+	if ok && skip < 15 { // print a max of 15 lines of trace
 		fun := runtime.FuncForPC(pc)
 		buf.WriteString(fmt.Sprint(fun.Name(), " -- ", file, ":", line, "\n"))
 		skip++
@@ -76,27 +78,26 @@ addtrace:
 	}
 
 	if buf.Len() > 0 {
-		trace := buf.String()
-		return errorTrace{err: errors.New(msg), trace: trace}
+		return ErrorTrace{trace: buf}
 	}
 
 	return errors.New("error generating error")
 }
 
-func (et errorTrace) Error() string {
-	return et.err.Error() + "\n  " + et.trace
+func (et ErrorTrace) Error() string {
+	return et.trace.String()
 }
 
 // BT prints a backtrace
 func BT(args ...interface{}) {
 	ts := time.Now().Format("2006-02-01 15:04:05: ")
-	println(ts, newErrorTrace(args...).Error())
+	println(ts, NewErrorTrace(2, args...).Error())
 }
 
 // FBT prints a backtrace and then panics (fatal backtrace)
 func FBT(args ...interface{}) {
 	ts := time.Now().Format("2006-02-01 15:04:05: ")
-	println(ts, newErrorTrace(args...).Error())
+	println(ts, NewErrorTrace(2, args...).Error())
 	panic("-----")
 }
 

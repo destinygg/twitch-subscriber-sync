@@ -2,10 +2,11 @@ package subscription
 
 import (
 	"database/sql"
+	"net/http"
 	"time"
 
 	"github.com/destinygg/website2/internal/debug"
-	"golang.org/x/net/context"
+	"github.com/gorilla/context"
 )
 
 // Row mirrors the backing database schema
@@ -20,17 +21,22 @@ type Row struct {
 	Timestamp      time.Time
 }
 
-func getDBFromContext(ctx context.Context) *sql.DB {
-	db, ok := ctx.Value("db").(*sql.DB)
+func getDBFromContext(r *http.Request) *sql.DB {
+	tdb, ok := context.GetOk(r, "db")
 	if !ok {
 		panic("Database not found in the context")
+	}
+
+	db, ok := tdb.(*sql.DB)
+	if !ok {
+		panic("Database not an *sql.DB")
 	}
 
 	return db
 }
 
 // Init expects to be called with the main context
-func Init(ctx context.Context) {
+func Init() {
 	/*
 		TODO set up array of durations for subscription end times, sort them
 		from lowest to highest, and wait on them, if one passes, signal the users pkg
@@ -43,8 +49,8 @@ func Init(ctx context.Context) {
 
 // Subscribed checks if the given userid is a subscriber and returns the tier
 // of the subscription, to differentiate
-func Subscribed(ctx context.Context, userid int64) (int, error) {
-	db := getDBFromContext(ctx)
+func Subscribed(r *http.Request, userid int64) (int, error) {
+	db := getDBFromContext(r)
 	stmt, err := db.Prepare(`
 		SELECT tier
 		FROM subscriptions
@@ -77,8 +83,8 @@ func Subscribed(ctx context.Context, userid int64) (int, error) {
 // to the end)
 // fix up the times of the subscriptions so that no time is lost and the
 // time interval is continous
-func Add(ctx context.Context, row *Row) {
-	db := getDBFromContext(ctx)
+func Add(r *http.Request, row *Row) {
+	db := getDBFromContext(r)
 	tx, err := db.Begin()
 	if err != nil {
 		panic(err.Error())

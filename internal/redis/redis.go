@@ -1,22 +1,28 @@
-package r
+package rds
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/destinygg/website2/internal/debug"
+	"github.com/gorilla/context"
 	"github.com/tideland/godm/v3/redis"
-	"golang.org/x/net/context"
 )
 
 // GetRedisConnFromContext tries to get a redis connection from the redis
 // database assigned to the context with the "redisdb" key
 // It panics if it cannot get a connection after 3 tries
 // The returned connection has to be .Return()-ed after use
-func GetRedisConnFromContext(ctx context.Context) *redis.Connection {
-	db, ok := ctx.Value("redisdb").(*redis.Database)
+func GetRedisConnFromContext(r *http.Request) *redis.Connection {
+	tdb, ok := context.GetOk(r, "redisdb")
 	if !ok {
 		panic("Redis database not found in the context")
+	}
+
+	db, ok := tdb.(*redis.Database)
+	if !ok {
+		panic("Redis database not a *redis.Database")
 	}
 
 	return GetConn(db)
@@ -76,8 +82,9 @@ func RunScript(conn *redis.Connection, hash string, args ...interface{}) (*redis
 	return conn.Do("EVALSHA", t...)
 }
 
-func pubsubchan(channel string, dbnum int) string {
-	return fmt.Sprintf("%s-%d", channel, dbnum)
+func pubsubchan(db *redis.Database, channel string) string {
+	opt := db.Options()
+	return fmt.Sprintf("%s-%d", channel, opt.Index)
 }
 
 // SetupSubscribe will set up a redis subscription on the channel suffixed by
@@ -92,9 +99,7 @@ again:
 		goto again
 	}
 
-	//dbnum := redis.GetIndex(db)
-	dbnum := 0
-	err = sub.Subscribe(pubsubchan(channel, dbnum))
+	err = sub.Subscribe(pubsubchan(db, channel))
 	if err != nil {
 		goto again
 	}
@@ -115,11 +120,8 @@ again:
 
 // Publish sends to the channel
 func Publish(db *redis.Database, channel string, msg []byte) error {
-	//dbnum := redis.GetDatabase(db)
-	dbnum := 0
 	conn := GetConn(db)
-
-	_, err := conn.Do("PUBLISH", pubsubchan(channel, dbnum), msg)
+	_, err := conn.Do("PUBLISH", pubsubchan(db, channel), msg)
 	return err
 }
 
