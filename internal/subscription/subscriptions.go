@@ -55,9 +55,8 @@ func Subscribed(r *http.Request, userid int64) (int, error) {
 		SELECT tier
 		FROM subscriptions
 		WHERE
-			userid          = ? AND
-			starttimestamp <= NOW() AND
-			endtimestamp   >= NOW()
+			targetuserid  = ? AND
+			endtimestamp >= NOW()
 		ORDER BY starttimestamp
 		LIMIT 1
 	`)
@@ -173,6 +172,10 @@ func getActiveSubs(tx *sql.Tx, userid int64) (rows []*Row) {
 	return rows
 }
 
+// assembleSubs will not work if rows are not ordered by tier desc, but we take
+// pains to fix up the timestamps so that higher tier subs are always in the
+// front, thus ordered, but indirectly (since this means there is no reason to
+// explicitly order by tier)
 func assembleSubs(rows []*Row, row *Row) []*Row {
 	var inserted bool
 	for k, v := range rows {
