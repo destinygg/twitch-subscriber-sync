@@ -4,10 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
+)
+
+const (
+	EnableDebug  = true
+	DisableDebug = false
 )
 
 var (
@@ -15,11 +23,19 @@ var (
 	debuggingenabled bool
 )
 
-// SetDebugPrint switches the printing of debugging information based on its arg
-func SetDebugPrint(enable bool) {
+// Init initializes the printing of debugging information based on its arg
+func Init(enable bool) {
 	mu.Lock()
 	debuggingenabled = enable
 	mu.Unlock()
+
+	w, err := os.OpenFile("logs/debug.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
+	if err != nil {
+		panic("logs/debug.txt" + err.Error())
+	}
+	mw := io.MultiWriter(os.Stderr, w)
+	log.SetOutput(mw)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 }
 
 func shouldprint() bool {
@@ -28,25 +44,49 @@ func shouldprint() bool {
 	return debuggingenabled
 }
 
+func getformatstr(numargs int, addlineinfo bool) string {
+	var formatstring string
+	if addlineinfo {
+		formatstring = "%+v:%+v \n  "
+	} else {
+		formatstring = "\n  "
+	}
+	for i := numargs; i >= 1; i-- {
+		formatstring += "|%+v|\n  "
+	}
+	formatstring += "\n\n"
+	return formatstring
+}
+
+func logwithcaller(file string, line int, args ...interface{}) {
+	pos := strings.LastIndex(file, "website2/") + len("website2/")
+	newargs := make([]interface{}, 0, len(args)+2)
+	newargs = append(newargs, file[pos:], line)
+	newargs = append(newargs, args...)
+	log.Printf(getformatstr(len(args), true), newargs...)
+}
+
 // D prints debug info about its arguments depending on whether debug printing
 // is enabled or not
 func D(args ...interface{}) {
 	if shouldprint() {
-		formatstring := ""
-		for i := len(args); i >= 1; i-- {
-			formatstring += " |%+v|"
+		_, file, line, ok := runtime.Caller(1)
+		if ok {
+			logwithcaller(file, line, args...)
+		} else {
+			log.Printf(getformatstr(len(args), false), args...)
 		}
-		log.Printf(formatstring, args...)
 	}
 }
 
 // P prints debug info about its arguments always
 func P(args ...interface{}) {
-	formatstring := ""
-	for i := len(args); i >= 1; i-- {
-		formatstring += " |%+v|"
+	_, file, line, ok := runtime.Caller(1)
+	if ok {
+		logwithcaller(file, line, args...)
+	} else {
+		log.Printf(getformatstr(len(args), false), args...)
 	}
-	log.Printf(formatstring, args...)
 }
 
 // source https://groups.google.com/forum/?fromgroups#!topic/golang-nuts/C24fRw8HDmI
@@ -58,9 +98,9 @@ type ErrorTrace struct {
 func NewErrorTrace(skip int, args ...interface{}) error {
 	buf := bytes.Buffer{}
 
-	formatstring := ""
+	formatstring := "\n  "
 	for i := len(args); i >= 1; i-- {
-		formatstring += "|%+v| "
+		formatstring += "|%+v|\n  "
 	}
 	formatstring += "\n"
 

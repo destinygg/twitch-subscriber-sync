@@ -9,6 +9,6 @@ import (
 
 func main() {
 	// TODO settings.cfg, launching of background tasks, global context?
-	d.SetDebugPrint(true)
+	d.Init(d.EnableDebug)
 	http.ListenAndServe(":9995", GetRouter())
 }
