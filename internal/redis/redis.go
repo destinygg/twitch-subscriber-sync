@@ -2,44 +2,40 @@ package rds
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
+	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
-	"github.com/gorilla/context"
 	"github.com/tideland/godm/v3/redis"
+	"golang.org/x/net/context"
 )
 
 // GetRedisConnFromContext tries to get a redis connection from the redis
 // database assigned to the context with the "redisdb" key
 // It panics if it cannot get a connection after 3 tries
 // The returned connection has to be .Return()-ed after use
-func GetRedisConnFromContext(r *http.Request) *redis.Connection {
-	tdb, ok := context.GetOk(r, "redisdb")
+func GetRedisConnFromContext(ctx context.Context) *redis.Connection {
+	db, ok := ctx.Value("redisdb").(*redis.Database)
 	if !ok {
 		panic("Redis database not found in the context")
-	}
-
-	db, ok := tdb.(*redis.Database)
-	if !ok {
-		panic("Redis database not a *redis.Database")
 	}
 
 	return GetConn(db)
 }
 
 // New sets up the redis database with the given arguments, panics if it cannot
-func New(addr string, dbnum int64, pw string, poolsize int) *redis.Database {
+func Init(ctx context.Context) context.Context {
+	cfg := ctx.Value("appconfig").(*config.AppConfig)
 	db, err := redis.Open(
-		redis.TcpConnection(addr, 1*time.Second),
-		redis.Index(int(dbnum), pw),
-		redis.PoolSize(poolsize),
+		redis.TcpConnection(cfg.Redis.Addr, 1*time.Second),
+		redis.Index(int(cfg.Redis.DBIndex), cfg.Redis.Password),
+		redis.PoolSize(cfg.Redis.PoolSize),
 	)
 	if err != nil {
 		d.FBT("Error making the redis pool", err)
 	}
 
-	return db
+	return context.WithValue(ctx, "redisdb", db)
 }
 
 // GetConn gets a connection from the database, it retries 3 times before panicing

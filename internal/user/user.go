@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/destinygg/website2/internal/redis"
-	"github.com/gorilla/context"
+	"golang.org/x/net/context"
 )
 
 type User struct {
@@ -19,24 +19,23 @@ type User struct {
 
 var sessioncookie = regexp.MustCompile(`^[a-z0-9]{10, 30}$`)
 
-func GetFromContext(r *http.Request) (*User, bool) {
-	u, ok := context.GetOk(r, "user")
+func GetFromContext(ctx context.Context) (*User, bool) {
+	u, ok := ctx.Value("user").(*User)
 	if !ok {
 		return nil, ok
 	}
 
-	ret, ok := u.(*User)
-	return ret, ok
+	return u, ok
 }
 
-func GetFromRequest(r *http.Request) (*User, error) {
+func GetFromRequest(ctx context.Context, r *http.Request) (*User, error) {
 	sessionid, err := r.Cookie("sid")
 	if err != nil || !sessioncookie.MatchString(sessionid.Value) {
 		// not an error, dont log it
 		return nil, nil
 	}
 
-	conn := rds.GetRedisConnFromContext(r)
+	conn := rds.GetRedisConnFromContext(ctx)
 	authdata, err := rds.GetBytes(conn, fmt.Sprintf("CHAT:session-%v", sessionid.Value))
 	if err != nil || len(authdata) == 0 {
 		return nil, fmt.Errorf("No sessiondata found |%v| |%v|", err, authdata)

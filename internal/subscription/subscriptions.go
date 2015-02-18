@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/destinygg/website2/internal/debug"
-	"github.com/gorilla/context"
+	"golang.org/x/net/context"
 )
 
 // Row mirrors the backing database schema
@@ -21,15 +21,10 @@ type Row struct {
 	Timestamp      time.Time
 }
 
-func getDBFromContext(r *http.Request) *sql.DB {
-	tdb, ok := context.GetOk(r, "db")
+func getDBFromContext(ctx context.Context) *sql.DB {
+	db, ok := context.Value("db").(*sql.DB)
 	if !ok {
 		panic("Database not found in the context")
-	}
-
-	db, ok := tdb.(*sql.DB)
-	if !ok {
-		panic("Database not an *sql.DB")
 	}
 
 	return db
@@ -49,8 +44,8 @@ func Init() {
 
 // Subscribed checks if the given userid is a subscriber and returns the tier
 // of the subscription, to differentiate
-func Subscribed(r *http.Request, userid int64) (int, error) {
-	db := getDBFromContext(r)
+func Subscribed(ctx context.Contest, r *http.Request, userid int64) (int, error) {
+	db := getDBFromContext(ctx)
 	stmt, err := db.Prepare(`
 		SELECT tier
 		FROM subscriptions
@@ -82,8 +77,8 @@ func Subscribed(r *http.Request, userid int64) (int, error) {
 // to the end)
 // fix up the times of the subscriptions so that no time is lost and the
 // time interval is continous
-func Add(r *http.Request, row *Row) {
-	db := getDBFromContext(r)
+func Add(ctx context.Context, r *http.Request, row *Row) {
+	db := getDBFromContext(ctx)
 	tx, err := db.Begin()
 	if err != nil {
 		panic(err.Error())

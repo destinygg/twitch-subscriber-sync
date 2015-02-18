@@ -6,33 +6,29 @@ import (
 	"github.com/destinygg/website2/internal/debug"
 	"github.com/destinygg/website2/internal/errorpages"
 	"github.com/destinygg/website2/internal/user"
-	"github.com/gorilla/context"
+	"golang.org/x/net/context"
 )
 
-func Auth(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, err := user.GetFromRequest(r)
-		if u == nil {
-			if err != nil {
-				d.D(err)
-			}
-
-			erp.AuthRequired(w, r)
-		} else {
-			context.Set(r, "user", u)
-			h.ServeHTTP(w, r)
+func Auth(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
+	u, err := user.GetFromRequest(ctx, r)
+	if u == nil {
+		if err != nil {
+			d.D(err)
 		}
-	})
+
+		erp.AuthRequired(w, r)
+		return ctx
+	} else {
+		return context.WithValue(ctx, "user", u)
+	}
 }
 
-func Recover(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer (func() {
-			if reason := recover(); reason != nil {
-				erp.Recover(reason, w, r)
-			}
-		})()
+func AdminAuth(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
+	// TODO
+	return ctx
+}
 
-		h.ServeHTTP(w, r)
-	})
+func Recover(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	reason := kami.Exception(ctx)
+	erp.Recover(reason, w, r)
 }

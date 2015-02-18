@@ -11,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/destinygg/website2/internal/config"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -24,18 +27,27 @@ var (
 )
 
 // Init initializes the printing of debugging information based on its arg
-func Init(enable bool) {
+func Init(ctx context.Context) context.Context {
+	cfg := ctx.Value("appconfig").(*config.AppConfig)
+
 	mu.Lock()
-	debuggingenabled = enable
+	debuggingenabled = cfg.Debug.Debug
 	mu.Unlock()
 
-	w, err := os.OpenFile("logs/debug.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
+	logfile := cfg.Debug.Logfile
+	if logfile == "" {
+		logfile = "logs/debug.txt"
+	}
+
+	w, err := os.OpenFile(logfile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
 	if err != nil {
-		panic("logs/debug.txt" + err.Error())
+		panic(logfile + err.Error())
 	}
 	mw := io.MultiWriter(os.Stderr, w)
 	log.SetOutput(mw)
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
+	return ctx
 }
 
 func shouldprint() bool {

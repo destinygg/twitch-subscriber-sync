@@ -1,14 +1,17 @@
 package main
 
 import (
-	"net/http"
-
+	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/destinygg/website2/internal/redis"
+	"golang.org/x/net/context"
 )
 
 func main() {
-	// TODO settings.cfg, launching of background tasks, global context?
-	d.Init(d.EnableDebug)
-	http.ListenAndServe(":9995", GetRouter())
+	ctx := context.Background()
+	ctx = config.Init(ctx)
+	ctx = d.Init(ctx)
+	ctx = rds.Init(ctx)
+	ctx = InitDB(ctx)
+	InitWebsite(ctx)
 }
