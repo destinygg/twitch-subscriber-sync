@@ -12,11 +12,8 @@ import (
 
 // InitWebsite does not return
 func InitWebsite(ctx context.Context) {
-	cfg, ok := ctx.Value("appconfig").(*config.AppConfig)
-	if !ok {
-		panic("could not get config for the website")
-	}
-
+	// set up defaults
+	kami.Context = ctx
 	middleware.RegisterPanicHandler()
 
 	// /donate requires authentication
@@ -25,12 +22,13 @@ func InitWebsite(ctx context.Context) {
 	kami.Post("/donate", DonationHandler)
 
 	// braintree integration endpoints
-	kami.Get("/braintree", BraintreeHandler)
+	kami.Get("/braintree", BraintreeVerifyHandler)
 	kami.Post("/braintree", BraintreeHandler)
 
 	http.Handle("/", kami.Handler())
 
+	cfg := config.GetFromContext(ctx)
 	if err := http.ListenAndServe(cfg.Website.Addr, nil); err != nil {
-		d.F("Failed to init website: %#v", err)
+		d.F("Failed to init website: %+v", err)
 	}
 }

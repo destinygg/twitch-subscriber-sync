@@ -28,17 +28,13 @@ var (
 
 // Init initializes the printing of debugging information based on its arg
 func Init(ctx context.Context) context.Context {
-	cfg := ctx.Value("appconfig").(*config.AppConfig)
+	cfg := config.GetFromContext(ctx)
 
 	mu.Lock()
 	debuggingenabled = cfg.Debug.Debug
 	mu.Unlock()
 
 	logfile := cfg.Debug.Logfile
-	if logfile == "" {
-		logfile = "logs/debug.txt"
-	}
-
 	w, err := os.OpenFile(logfile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
 	if err != nil {
 		panic(logfile + err.Error())

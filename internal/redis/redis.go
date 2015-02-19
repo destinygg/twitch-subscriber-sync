@@ -25,7 +25,7 @@ func GetRedisConnFromContext(ctx context.Context) *redis.Connection {
 
 // New sets up the redis database with the given arguments, panics if it cannot
 func Init(ctx context.Context) context.Context {
-	cfg := ctx.Value("appconfig").(*config.AppConfig)
+	cfg := config.GetFromContext(ctx)
 	db, err := redis.Open(
 		redis.TcpConnection(cfg.Redis.Addr, 1*time.Second),
 		redis.Index(int(cfg.Redis.DBIndex), cfg.Redis.Password),

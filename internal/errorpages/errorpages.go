@@ -12,6 +12,11 @@ func AuthRequired(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "authentication required", http.StatusForbidden)
 }
 
+func BadRequest(w http.ResponseWriter, r *http.Request) {
+	// TODO proper template again
+	http.Error(w, "bad parameters", http.StatusBadRequest)
+}
+
 func Recover(reason interface{}, w http.ResponseWriter, r *http.Request) {
 	// TODO get a stack trace and as much info as possible, save it under some
 	// key and show the user only that key

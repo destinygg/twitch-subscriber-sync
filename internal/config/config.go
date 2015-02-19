@@ -70,7 +70,7 @@ debug=no
 logfile=logs/debug.txt
 
 [database]
-dsn=user:password@tcp(localhost:3306)/destinygg?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone="+00:00"
+dsn=user:password@tcp(localhost:3306)/destinygg?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone='+00:00'
 maxidleconnections=128
 maxconnections=256
 
@@ -120,4 +120,9 @@ func ReadConfig(f *os.File) *AppConfig {
 	}
 
 	return ret
+}
+
+func GetFromContext(ctx context.Context) *AppConfig {
+	cfg, _ := ctx.Value("appconfig").(*AppConfig)
+	return cfg
 }
