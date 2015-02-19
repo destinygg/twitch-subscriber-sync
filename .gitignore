@@ -4,3 +4,4 @@ deploy.sh
 precommit
 *.pprof
 .state.dc
+.settings.cfg

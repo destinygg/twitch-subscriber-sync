@@ -1,10 +1,11 @@
 package config
 
 import (
+	"flag"
 	"io"
 	"os"
 
-	//"code.google.com/p/gcfg"
+	"code.google.com/p/gcfg"
 	"golang.org/x/net/context"
 )
 
@@ -34,9 +35,17 @@ type Redis struct {
 }
 
 type Braintree struct {
-	MerchantID string
-	PublicKey  string
-	PrivateKey string
+	Environment string
+	MerchantID  string
+	PublicKey   string
+	PrivateKey  string
+}
+
+type SMTP struct {
+	Addr     string
+	Username string
+	Password string
+	Logemail []string
 }
 
 type AppConfig struct {
@@ -45,10 +54,13 @@ type AppConfig struct {
 	Database
 	Redis
 	Braintree
+	SMTP
 }
 
-const sampleconf = `
-[website]
+var settingsFile = flag.String("config", "settings.cfg", `path to the config file, it it doesn't exist it will
+		be created with default values`)
+
+const sampleconf = `[website]
 addr=:80
 basehost=www.destiny.gg
 cdnhost=cdn.destiny.gg
@@ -66,31 +78,46 @@ maxconnections=256
 addr=localhost:6379
 dbindex=0
 password=
-poolsize=20
+poolsize=128
 
 [braintree]
+environment=production
 merchantid=
 publickey=
 privatekey=
+
+[smtp]
+addr=
+username=
+password=
+# where to send error emails to, if there are multiple logemail= lines every one
+# of them will receive the emails
+logemail=
 `
 
 func Init(ctx context.Context) context.Context {
-	// TODO use a flag for getting the config file name?
-	f, err := os.OpenFile("settings.cfg", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0660)
+	flag.Parse()
+	f, err := os.OpenFile(*settingsFile, os.O_CREATE|os.O_RDWR, 0660)
 	if err != nil {
-		panic("could not open settings.cfg")
+		panic("Could not open " + *settingsFile + " err: " + err.Error())
+	}
+	defer f.Close()
+
+	// empty? initialize it
+	if info, err := f.Stat(); err == nil && info.Size() == 0 {
+		io.WriteString(f, sampleconf)
+		f.Seek(0, 0)
 	}
 
 	cfg := ReadConfig(f)
-	if cfg == nil {
-		io.WriteString(f, sampleconf)
-		f.Seek(0, 0)
-		cfg = ReadConfig(f)
-	}
-
 	return context.WithValue(ctx, "appconfig", cfg)
 }
 
 func ReadConfig(f *os.File) *AppConfig {
-	return nil
+	ret := &AppConfig{}
+	if err := gcfg.ReadInto(ret, f); err != nil {
+		panic("Failed to parse config file, err: " + err.Error())
+	}
+
+	return ret
 }
