@@ -6,6 +6,7 @@ import (
 	"github.com/destinygg/website2/internal/debug"
 	"github.com/destinygg/website2/internal/errorpages"
 	"github.com/destinygg/website2/internal/user"
+	"github.com/guregu/kami"
 	"golang.org/x/net/context"
 )
 
@@ -28,7 +29,11 @@ func AdminAuth(ctx context.Context, w http.ResponseWriter, r *http.Request) cont
 	return ctx
 }
 
-func Recover(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func RegisterPanicHandler() {
+	kami.PanicHandler = recover
+}
+
+func recover(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	reason := kami.Exception(ctx)
 	erp.Recover(reason, w, r)
 }
