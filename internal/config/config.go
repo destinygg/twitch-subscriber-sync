@@ -42,10 +42,11 @@ type Braintree struct {
 }
 
 type SMTP struct {
-	Addr     string
-	Username string
-	Password string
-	Logemail []string
+	Addr      string
+	Username  string
+	Password  string
+	FromEmail string
+	LogEmail  []string
 }
 
 type AppConfig struct {
@@ -90,6 +91,7 @@ privatekey=
 addr=
 username=
 password=
+fromemail=
 # where to send error emails to, if there are multiple logemail= lines every one
 # of them will receive the emails
 logemail=
