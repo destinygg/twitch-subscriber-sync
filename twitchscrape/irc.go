@@ -16,9 +16,13 @@ type IConn struct {
 	conn net.Conn
 	*irc.Decoder
 	*irc.Encoder
-	tries        float64
-	cfg          *config.TwitchScrape
-	pendingpings int
+	cfg *config.TwitchScrape
+	// exponentially increase the time we sleep based on the number of tries
+	// only resets when successfully connected to the server
+	tries float64
+	// the number of pings that were sent but not yet answered, should never go
+	// beyond 2
+	pendingPings int
 }
 
 func (c *IConn) Reconnect() {
@@ -29,16 +33,15 @@ func (c *IConn) Reconnect() {
 		return
 	}
 
-	c.pendingpings = 0
+	c.pendingPings = 0
 	c.conn = conn
 	c.Decoder = irc.NewDecoder(conn)
 	c.Encoder = irc.NewEncoder(conn)
 
 	pw := "oauth:" + c.cfg.OAuthToken
-	_ = c.Write(&irc.Message{Command: irc.PASS, Params: []string{pw}})
-	_ = c.Write(&irc.Message{Command: irc.NICK, Params: []string{c.cfg.Nick}})
-	// nothing matters in this message
-	_ = c.Write(&irc.Message{Command: irc.USER, Params: []string{"a", "b", "c"}, Trailing: "d"})
+	c.Write(&irc.Message{Command: irc.PASS, Params: []string{pw}})
+	c.Write(&irc.Message{Command: irc.NICK, Params: []string{c.cfg.Nick}})
+	// sending irc.USER isn't even required, so just skip it
 }
 
 func (c *IConn) delayAndLog(format string, args ...interface{}) time.Duration {
@@ -53,36 +56,33 @@ func (c *IConn) logWithDuration(format string, dur time.Duration, args ...interf
 	newargs := make([]interface{}, 0, len(args)+1)
 	newargs = append(newargs, args...)
 	newargs = append(newargs, dur)
-	d.PF(2, "irc: "+format+", reconnecting in %s", newargs...)
+	d.PF(2, format+", reconnecting in %s", newargs...)
 }
 
-func (c *IConn) Write(m *irc.Message) error {
-	var err error
-	c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+func (c *IConn) Write(m *irc.Message) {
+	_ = c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	d.DF(2, "\t> %+v", m)
-	if err = c.Encode(m); err != nil {
+	if err := c.Encode(m); err != nil {
 		c.delayAndLog("write error: %+v", err)
 		c.Reconnect()
 	}
-
-	return err
 }
 
 func (c *IConn) Read() *irc.Message {
 	// if there are pending pings, lower the timeout duration to speed up
 	// the disconnection
-	if c.pendingpings > 0 {
-		c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if c.pendingPings > 0 {
+		_ = c.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	} else {
-		c.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		_ = c.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	}
 
 	m, err := c.Decode()
 	if err == nil {
 		// we do not actually care about the type of the message the server sends us,
 		// as long as it sends something it signals that its alive
-		if c.pendingpings > 0 {
-			c.pendingpings--
+		if c.pendingPings > 0 {
+			c.pendingPings--
 		}
 
 		d.DF(2, "\t< %+v", m)
@@ -90,8 +90,8 @@ func (c *IConn) Read() *irc.Message {
 	}
 
 	// if we hit the timeout and there are no outstanding pings, send one
-	if e, ok := err.(net.Error); ok && e.Timeout() && c.pendingpings < 1 {
-		c.pendingpings++
+	if e, ok := err.(net.Error); ok && e.Timeout() && c.pendingPings < 1 {
+		c.pendingPings++
 		c.Write(&irc.Message{
 			Command: "PING",
 			Params:  []string{"destinygg-subscription-notifier"},
@@ -107,7 +107,7 @@ func (c *IConn) Read() *irc.Message {
 
 func InitIRC(ctx context.Context) {
 	// TODO implement metrics for emote usage, lines per sec, etc
-	cfg := config.GetFromContext(ctx).TwitchScrape
+	cfg := &config.GetFromContext(ctx).TwitchScrape
 	c := &IConn{cfg: cfg}
 	c.Reconnect()
 
@@ -118,9 +118,8 @@ func InitIRC(ctx context.Context) {
 		}
 
 		switch m.Command {
-
 		case irc.PING:
-			_ = c.Write(&irc.Message{Command: irc.PONG, Params: m.Params, Trailing: m.Trailing})
+			c.Write(&irc.Message{Command: irc.PONG, Params: m.Params, Trailing: m.Trailing})
 		case irc.RPL_WELCOME: // successfully connected
 			c.tries = 0
 			c.Write(&irc.Message{Command: irc.JOIN, Params: []string{"#" + cfg.Channel}})
