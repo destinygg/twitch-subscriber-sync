@@ -12,6 +12,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+// IConn represents the IRC connection to twitch,
+// it is purely "single-threaded", methods are not safe to call concurrently
 type IConn struct {
 	conn net.Conn
 	*irc.Decoder
@@ -49,6 +51,11 @@ func (c *IConn) Reconnect() {
 }
 
 func (c *IConn) delayAndLog(format string, args ...interface{}) time.Duration {
+	// clamp tries, so that the maximum amount of time we wait is ~5 minutes
+	if c.tries > 40.0 {
+		c.tries = 40.0
+	}
+
 	d := time.Duration(math.Pow(2.0, c.tries)*200) * time.Millisecond
 	c.logWithDuration(format, d, args...)
 	time.Sleep(d)
@@ -63,6 +70,7 @@ func (c *IConn) logWithDuration(format string, dur time.Duration, args ...interf
 	d.PF(2, format+", reconnecting in %s", newargs...)
 }
 
+// Write handles sending messages, it reconnects if there are problems
 func (c *IConn) Write(m *irc.Message) {
 	_ = c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	d.DF(2, "\t> %+v", m)
@@ -72,6 +80,8 @@ func (c *IConn) Write(m *irc.Message) {
 	}
 }
 
+// Read handles parsing messages from IRC and reconnects if there are problems
+// returns nil on error
 func (c *IConn) Read() *irc.Message {
 	// if there are pending pings, lower the timeout duration to speed up
 	// the disconnection
@@ -117,6 +127,7 @@ func InitIRC(ctx context.Context) {
 
 	for {
 		m := c.Read()
+		// if we read nil, there was an error/timeout, Read will handle reconnection
 		if m == nil {
 			continue
 		}
