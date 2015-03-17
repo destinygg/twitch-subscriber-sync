@@ -71,11 +71,11 @@ func (c *IConn) Reconnect() {
 
 func (c *IConn) delayAndLog(format string, args ...interface{}) time.Duration {
 	// clamp tries, so that the maximum amount of time we wait is ~5 minutes
-	if c.tries > 11.0 {
-		c.tries = 11.0
+	if c.tries > 10.0 {
+		c.tries = 10.0
 	}
 
-	d := time.Duration(math.Pow(2.0, c.tries)*200) * time.Millisecond
+	d := time.Duration(math.Pow(2.0, c.tries)*300) * time.Millisecond
 	c.logWithDuration(format, d, args...)
 	time.Sleep(d)
 	c.tries++
