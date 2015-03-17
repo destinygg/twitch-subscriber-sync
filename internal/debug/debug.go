@@ -1,3 +1,5 @@
+// The d package is just a very simple collection of debugging and logging aids
+// everything is safe to call from anywhere
 package d
 
 import (
@@ -23,7 +25,7 @@ const (
 
 var (
 	mu               sync.RWMutex
-	debuggingenabled bool
+	debuggingEnabled bool
 )
 
 // Init initializes the printing of debugging information based on its arg
@@ -31,7 +33,7 @@ func Init(ctx context.Context) context.Context {
 	cfg := config.GetFromContext(ctx)
 
 	mu.Lock()
-	debuggingenabled = cfg.Debug.Debug
+	debuggingEnabled = cfg.Debug.Debug
 	mu.Unlock()
 
 	logfile := cfg.Debug.Logfile
@@ -46,44 +48,63 @@ func Init(ctx context.Context) context.Context {
 	return ctx
 }
 
-func shouldprint() bool {
+func shouldPrint() bool {
 	mu.RLock()
 	defer mu.RUnlock()
-	return debuggingenabled
+	return debuggingEnabled
 }
 
-func getformatstr(numargs int, addlineinfo bool) string {
-	var formatstring string
+func getFormatStr(numargs int, addlineinfo bool) string {
+	var formatStr string
 	if addlineinfo {
-		formatstring = "%+v:%+v \n  "
+		formatStr = "%+v:%+v \n  "
 	} else {
-		formatstring = "\n  "
+		formatStr = "\n  "
 	}
 	for i := numargs; i >= 1; i-- {
-		formatstring += "|%+v|\n  "
+		formatStr += "|%+v|\n  "
 	}
-	formatstring += "\n\n"
-	return formatstring
+	formatStr += "\n\n"
+	return formatStr
 }
 
-func logwithcaller(file string, line int, args ...interface{}) {
+func logWithCaller(file string, line int, args ...interface{}) {
 	pos := strings.LastIndex(file, "website2/") + len("website2/")
 	newargs := make([]interface{}, 0, len(args)+2)
 	newargs = append(newargs, file[pos:], line)
 	newargs = append(newargs, args...)
-	log.Printf(getformatstr(len(args), true), newargs...)
+	log.Printf(getFormatStr(len(args), true), newargs...)
 }
 
 // D prints debug info about its arguments depending on whether debug printing
 // is enabled or not
 func D(args ...interface{}) {
-	if shouldprint() {
+	if shouldPrint() {
 		_, file, line, ok := runtime.Caller(1)
 		if ok {
-			logwithcaller(file, line, args...)
+			logWithCaller(file, line, args...)
 		} else {
-			log.Printf(getformatstr(len(args), false), args...)
+			log.Printf(getFormatStr(len(args), false), args...)
 		}
+	}
+}
+
+// DF prints debug info and allows specifying how many stack frames to skip and
+// expects a format string, only prints if debug printing is enabled
+func DF(skip int, format string, args ...interface{}) {
+	if !shouldPrint() {
+		return
+	}
+
+	_, file, line, ok := runtime.Caller(skip)
+	if ok {
+		pos := strings.LastIndex(file, "website2/") + len("website2/")
+		newargs := make([]interface{}, 0, len(args)+2)
+		newargs = append(newargs, file[pos:], line)
+		newargs = append(newargs, args...)
+		log.Printf("%+v:%+v "+format+"\n", newargs...)
+	} else {
+		log.Printf(format, args...)
 	}
 }
 
@@ -91,10 +112,30 @@ func D(args ...interface{}) {
 func P(args ...interface{}) {
 	_, file, line, ok := runtime.Caller(1)
 	if ok {
-		logwithcaller(file, line, args...)
+		logWithCaller(file, line, args...)
 	} else {
-		log.Printf(getformatstr(len(args), false), args...)
+		log.Printf(getFormatStr(len(args), false), args...)
 	}
+}
+
+// PF prints debug info and allows specifying how many stack frames to skip and
+// expects a format string, always prints
+func PF(skip int, format string, args ...interface{}) {
+	_, file, line, ok := runtime.Caller(skip)
+	if ok {
+		pos := strings.LastIndex(file, "website2/") + len("website2/")
+		newargs := make([]interface{}, 0, len(args)+2)
+		newargs = append(newargs, file[pos:], line)
+		newargs = append(newargs, args...)
+		log.Printf("%+v:%+v "+format+"\n", newargs...)
+	} else {
+		log.Printf(format, args...)
+	}
+}
+
+// F calls panic with a formatted string based on its arguments
+func F(format string, args ...interface{}) {
+	panic(fmt.Sprintf(format, args...))
 }
 
 // source https://groups.google.com/forum/?fromgroups#!topic/golang-nuts/C24fRw8HDmI
@@ -106,14 +147,14 @@ type ErrorTrace struct {
 func NewErrorTrace(skip int, args ...interface{}) error {
 	buf := bytes.Buffer{}
 
-	formatstring := "\n  "
+	formatStr := "\n  "
 	for i := len(args); i >= 1; i-- {
-		formatstring += "|%+v|\n  "
+		formatStr += "|%+v|\n  "
 	}
-	formatstring += "\n"
+	formatStr += "\n"
 
-	if len(formatstring) != 0 {
-		buf.WriteString(fmt.Sprintf(formatstring, args...))
+	if len(formatStr) != 0 {
+		buf.WriteString(fmt.Sprintf(formatStr, args...))
 	}
 
 addtrace:
@@ -147,9 +188,4 @@ func FBT(args ...interface{}) {
 	ts := time.Now().Format("2006-02-01 15:04:05: ")
 	println(ts, NewErrorTrace(2, args...).Error())
 	panic("-----")
-}
-
-// F calls panic with a formatted string based on its arguments
-func F(format string, args ...interface{}) {
-	panic(fmt.Sprintf(format, args...))
 }
