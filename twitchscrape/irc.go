@@ -26,6 +26,10 @@ type IConn struct {
 }
 
 func (c *IConn) Reconnect() {
+	if c.conn != nil {
+		_ = c.conn.Close()
+	}
+
 	conn, err := net.DialTimeout("tcp", c.cfg.Addr, 5*time.Second)
 	if err != nil {
 		c.delayAndLog("conn error: %+v", err)
