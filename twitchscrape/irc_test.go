@@ -25,19 +25,22 @@ import (
 )
 
 func TestSubMatch(t *testing.T) {
-	tests := map[string]string{
-		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :Wortavin just subscribed!":                     "Wortavin",
-		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :xanctius subscribed for 2 months in a row!":    "xanctius",
-		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :gruffalo50 subscribed for 19 months in a row!": "gruffalo50",
-		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :something invalid!":                            "",
+	tests := map[string]struct {
+		nick  string
+		resub bool
+	}{
+		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :Wortavin just subscribed!":                     {"Wortavin", false},
+		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :xanctius subscribed for 2 months in a row!":    {"xanctius", true},
+		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :gruffalo50 subscribed for 19 months in a row!": {"gruffalo50", true},
+		":twitchnotify!twitchnotify@twitchnotify.tmi.twitch.tv PRIVMSG #itmejp :something invalid!":                            {"", false},
 	}
 
 	for raw, expected := range tests {
-		m := irc.ParseMessage(r)
-		nick := getNewSubNick(m)
+		m := irc.ParseMessage(raw)
+		nick, resub := getNewSubNick(m)
 
-		if nick != expected {
-			t.Errorf("Expected nick %s, got %s", expected, nick)
+		if nick != expected.nick && resub != expected.resub {
+			t.Errorf("Expected nick %s resub: %v, got %s %v", expected.nick, expected.resub, nick, resub)
 		}
 	}
 }

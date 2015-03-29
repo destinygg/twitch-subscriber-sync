@@ -27,6 +27,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
@@ -37,6 +38,8 @@ import (
 
 type Api struct {
 	cfg *config.AppConfig
+
+	mu sync.Mutex
 	// subs are keyed by ids that are alphanumeric but not necessarily only digits
 	subs       map[string]int
 	nicksToIDs map[string]string
@@ -128,7 +131,11 @@ func (a *Api) fromNick(nick string) string {
 	}
 }
 
+// ReSub is safe to call concurrently
 func (a *Api) ReSub(nick string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if id := a.fromNick(nick); id != "" {
 		a.subs[id] = 1
 
@@ -137,7 +144,11 @@ func (a *Api) ReSub(nick string) {
 	}
 }
 
+// AddSub is safe to call concurrently
 func (a *Api) AddSub(nick string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if id := a.fromNick(nick); id != "" {
 		a.subs[id] = 1
 
@@ -155,13 +166,15 @@ func (a Api) syncSubs(subs map[string]int, url string) {
 
 func (a *Api) run(tw *twitch.Twitch) {
 	t := time.NewTicker(time.Duration(a.cfg.PollMinutes) * time.Minute)
-	a.getSubs()
 
 loop:
+	a.mu.Lock()
+	a.getSubs()
 	users := tw.GetSubs()
 	diff := make(map[string]int)
 	visited := make(map[string]struct{}, len(users))
 
+	d.D("got subs:", users)
 	for _, u := range users {
 		a.nicksToIDs[u.Name] = u.ID // used by the resubs
 		visited[u.ID] = struct{}{}
@@ -171,6 +184,7 @@ loop:
 		if wassub != 1 { // was not a sub before, but is now
 			a.subs[u.ID] = 1
 			diff[u.ID] = 1
+			d.D("twitch user", u.Name, "is now a sub")
 		}
 	}
 
@@ -183,10 +197,15 @@ loop:
 		if wassub == 1 { // was a sub, but is no longer
 			a.subs[id] = 0
 			diff[id] = 0
+			d.D("twitch user with id", id, "is no longer a sub")
 		}
 	}
 
-	a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
+	if len(diff) > 0 {
+		d.D("syncing subs:", diff)
+		a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
+	}
+	a.mu.Unlock()
 	_ = <-t.C
 	goto loop
 }

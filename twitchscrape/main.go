@@ -39,7 +39,7 @@ func main() {
 	ctx = twitch.Init(ctx)
 	ctx = api.Init(ctx)
 	twirc.Init(ctx, func(c *twirc.IConn, m *irc.Message) {
-		// TODO handle syncing of bans
+		// TODO handle syncing of bans PRIVMSG #destiny :.unban username
 		// TODO creation date of subs (need to do it everywhere at the same time)
 		a := api.GetFromContext(ctx)
 
