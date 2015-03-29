@@ -27,6 +27,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -123,6 +124,7 @@ func (a *Api) getSubs() {
 }
 
 func (a *Api) fromNick(nick string) string {
+	nick = strings.ToLower(nick)
 	if id, ok := a.nicksToIDs[nick]; ok {
 		return id
 	} else {
@@ -149,12 +151,13 @@ func (a *Api) AddSub(nick string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if id := a.fromNick(nick); id != "" {
-		a.subs[id] = 1
-
-		d := map[string]int{id: 1}
-		a.syncSubs(d, a.cfg.TwitchScrape.ModSubURL)
-	}
+	data := struct {
+		nick string
+	}{nick: nick}
+	buf := bytes.Buffer{}
+	enc := json.NewEncoder(&buf)
+	_ = enc.Encode(data)
+	a.call("POST", a.cfg.TwitchScrape.AddSubURL, &buf)
 }
 
 func (a Api) syncSubs(subs map[string]int, url string) {
@@ -174,17 +177,22 @@ loop:
 	diff := make(map[string]int)
 	visited := make(map[string]struct{}, len(users))
 
-	d.D("got subs:", users)
+	d.D("got subs:", len(users), users)
 	for _, u := range users {
-		a.nicksToIDs[u.Name] = u.ID // used by the resubs
+		nick := strings.ToLower(u.Name)
+		a.nicksToIDs[nick] = u.ID
 		visited[u.ID] = struct{}{}
 
-		// we might not find the user, but report it anyway
-		wassub := a.subs[u.ID]
-		if wassub != 1 { // was not a sub before, but is now
+		wassub, ok := a.subs[u.ID]
+		if wassub != 1 && ok { // was not a sub before, but is now
 			a.subs[u.ID] = 1
 			diff[u.ID] = 1
-			d.D("twitch user", u.Name, "is now a sub")
+			d.D("found twitch user", u.Name, "and is now a sub")
+		} else if !ok {
+			diff[u.ID] = 1
+			d.D("not found twitch user", u.Name, "and is a sub")
+		} else {
+			d.D("found twitch user", u.Name, "but already a sub")
 		}
 	}
 
@@ -201,10 +209,8 @@ loop:
 		}
 	}
 
-	if len(diff) > 0 {
-		d.D("syncing subs:", diff)
-		a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
-	}
+	d.D("syncing subs:", diff)
+	a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
 	a.mu.Unlock()
 	_ = <-t.C
 	goto loop

@@ -77,6 +77,7 @@ type Metrics struct {
 type TwitchScrape struct {
 	OAuthToken  string
 	GetSubURL   string
+	AddSubURL   string
 	ModSubURL   string
 	ReSubURL    string
 	PollMinutes int64
@@ -148,6 +149,7 @@ password=
 # requires scopes: channel_subscriptions channel_check_subscription chat_login
 oauthtoken=generateone
 getsuburl=http://127.0.0.1/api/twitchsubscriptions
+addsuburl=http://127.0.0.1/api/addtwitchsubscription
 modsuburl=http://127.0.0.1/api/twitchsubscriptions
 resuburl=http://127.0.0.1/api/twitchresubscription
 # how many minutes between syncing the subs over
