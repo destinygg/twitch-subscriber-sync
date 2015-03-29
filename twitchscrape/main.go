@@ -20,18 +20,54 @@
 package main
 
 import (
+	"regexp"
+
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
+	"github.com/destinygg/website2/twitchscrape/api"
+	"github.com/destinygg/website2/twitchscrape/twirc"
+	"github.com/destinygg/website2/twitchscrape/twitch"
+	"github.com/sorcix/irc"
 	"golang.org/x/net/context"
 )
 
 func main() {
 	ctx := context.Background()
 	ctx = config.Init(ctx)
-	cfg := config.GetFromContext(ctx)
 
-	d.Init(ctx)
-	InitTwitch(&cfg.TwitchScrape)
-	InitApi(cfg) // api will require more than just the scraper config
-	InitIRC(ctx)
+	ctx = d.Init(ctx)
+	ctx = twitch.Init(ctx)
+	ctx = api.Init(ctx)
+	twirc.Init(ctx, func(c *twirc.IConn, m *irc.Message) {
+		// TODO handle syncing of bans
+		// TODO creation date of subs (need to do it everywhere at the same time)
+		a := api.GetFromContext(ctx)
+
+		switch m.Command {
+		case irc.PRIVMSG:
+			if nick, resub := getNewSubNick(m); nick != "" {
+				if resub {
+					a.ReSub(nick)
+				} else {
+					a.AddSub(nick)
+				}
+			}
+		}
+	})
+}
+
+var subRe = regexp.MustCompile(`^([^ ]+) (?:just subscribed|subscribed for (\d+) months in a row)!$`)
+
+func getNewSubNick(m *irc.Message) (nick string, resub bool) {
+	if m.Prefix.Name != "twitchnotify" {
+		return
+	}
+
+	match := subRe.FindStringSubmatch(m.Trailing)
+	d.DF(1, "< MATCHED %+v, %+v", match, m)
+	if len(match) < 2 {
+		return
+	}
+
+	return match[1], match[2] != ""
 }

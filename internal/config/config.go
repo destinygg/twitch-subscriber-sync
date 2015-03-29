@@ -76,9 +76,9 @@ type Metrics struct {
 
 type TwitchScrape struct {
 	OAuthToken  string
-	AddSubURL   string
-	DelSubURL   string
 	GetSubURL   string
+	ModSubURL   string
+	ReSubURL    string
 	PollMinutes int64
 	Addr        string
 	Nick        string
@@ -147,9 +147,9 @@ password=
 # password to the twitch irc server,
 # requires scopes: channel_subscriptions channel_check_subscription chat_login
 oauthtoken=generateone
-addsuburl=http://127.0.0.1/api/twitch/addsub
-delsuburl=http://127.0.0.1/api/twitch/delsub
-getsuburl=http://127.0.0.1/api/twitch/getsub
+getsuburl=http://127.0.0.1/api/twitchsubscriptions
+modsuburl=http://127.0.0.1/api/twitchsubscriptions
+resuburl=http://127.0.0.1/api/twitchresubscription
 # how many minutes between syncing the subs over
 pollminutes=60
 addr=irc.twitch.tv:6667

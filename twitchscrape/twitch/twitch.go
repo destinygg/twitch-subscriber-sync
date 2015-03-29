@@ -17,35 +17,47 @@
   along with twitchscrape; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-package main
+package twitch
 
 import (
 	_ "crypto/sha512"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
+	"golang.org/x/net/context"
 )
-
-var twitch *Twitch
 
 type Twitch struct {
 	cfg     *config.TwitchScrape
 	apibase string
 }
-
-func InitTwitch(cfg *config.TwitchScrape) {
-	twitch = &Twitch{
-		cfg:     cfg,
-		apibase: "https://api.twitch.tv/kraken/",
-	}
+type User struct {
+	ID      string
+	Name    string
+	Created time.Time
 }
 
-func (t *Twitch) GetSubs() map[string]time.Time {
+func Init(ctx context.Context) context.Context {
+	tw := &Twitch{
+		cfg:     &config.GetFromContext(ctx).TwitchScrape,
+		apibase: "https://api.twitch.tv/kraken/",
+	}
+
+	return context.WithValue(ctx, "twitch", tw)
+}
+
+func GetFromContext(ctx context.Context) *Twitch {
+	cfg, _ := ctx.Value("twitch").(*Twitch)
+	return cfg
+}
+
+func (t *Twitch) GetSubs() []User {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -55,7 +67,7 @@ func (t *Twitch) GetSubs() map[string]time.Time {
 	}
 
 	var err error
-	var users map[string]time.Time
+	var users []User
 
 	/*
 	  {
@@ -96,6 +108,7 @@ func (t *Twitch) GetSubs() map[string]time.Time {
 			Created string `json:"created_at"`
 			User    struct {
 				Name string `json:"name"`
+				ID   int    `json:"_id"`
 			} `json:"user"`
 		} `json:"subscriptions"`
 	}
@@ -116,14 +129,13 @@ func (t *Twitch) GetSubs() map[string]time.Time {
 
 		dec := json.NewDecoder(resp.Body)
 		err = dec.Decode(&js)
+		_ = resp.Body.Close()
 		if err != nil {
 			d.F("Failed to decode json, err: %+v", err)
 		}
 
-		_ = resp.Body.Close()
-
 		if users == nil {
-			users = make(map[string]time.Time, js.Total)
+			users = make([]User, 0, js.Total)
 		}
 
 		if len(js.Subs) == 0 {
@@ -132,7 +144,11 @@ func (t *Twitch) GetSubs() map[string]time.Time {
 
 		for _, s := range js.Subs {
 			t, _ := time.ParseInLocation("2006-01-02T15:04:05Z", s.Created, time.UTC)
-			users[s.User.Name] = t
+			users = append(users, User{
+				ID:      fmt.Sprintf("%v", s.User.ID),
+				Name:    s.User.Name,
+				Created: t,
+			})
 		}
 
 		u, err := url.Parse(js.Links.Next)

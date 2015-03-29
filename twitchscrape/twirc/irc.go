@@ -17,12 +17,11 @@
   along with twitchscrape; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-package main
+package twirc
 
 import (
 	"math"
 	"net"
-	"regexp"
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
@@ -69,7 +68,7 @@ func (c *IConn) Reconnect() {
 	// sending irc.USER isn't even required, so just skip it
 }
 
-func (c *IConn) delayAndLog(format string, args ...interface{}) time.Duration {
+func (c *IConn) delayAndLog(format string, args ...interface{}) {
 	// clamp tries, so that the maximum amount of time we wait is ~5 minutes
 	if c.tries > 10.0 {
 		c.tries = 10.0
@@ -79,7 +78,6 @@ func (c *IConn) delayAndLog(format string, args ...interface{}) time.Duration {
 	c.logWithDuration(format, d, args...)
 	time.Sleep(d)
 	c.tries++
-	return d
 }
 
 func (c *IConn) logWithDuration(format string, dur time.Duration, args ...interface{}) {
@@ -138,7 +136,7 @@ func (c *IConn) Read() *irc.Message {
 	return nil
 }
 
-func InitIRC(ctx context.Context) {
+func Init(ctx context.Context, cb func(*IConn, *irc.Message)) {
 	// TODO implement metrics for emote usage, lines per sec, etc
 	cfg := &config.GetFromContext(ctx).TwitchScrape
 	c := &IConn{cfg: cfg}
@@ -157,25 +155,8 @@ func InitIRC(ctx context.Context) {
 		case irc.RPL_WELCOME: // successfully connected
 			c.tries = 0
 			c.Write(&irc.Message{Command: irc.JOIN, Params: []string{"#" + cfg.Channel}})
-		case irc.PRIVMSG:
-			nick := getNewSubNick(m)
-			if nick != "" {
-				api.AddSubs([]string{nick})
-			}
+		default:
+			cb(c, m)
 		}
 	}
-}
-
-var subRe = regexp.MustCompile(`^([^ ]+) (?:just subscribed|subscribed for \d+ months in a row)!$`)
-
-func getNewSubNick(m *irc.Message) string {
-	if m.Prefix.Name == "twitchnotify" {
-		match := subRe.FindStringSubmatch(m.Trailing)
-		d.DF(1, "< MATCHED %+v, %+v", match, m)
-		if len(match) == 2 {
-			return match[1]
-		}
-	}
-
-	return ""
 }
