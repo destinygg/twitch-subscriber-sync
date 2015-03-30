@@ -29,17 +29,23 @@ import (
 	"golang.org/x/net/context"
 )
 
-// GetRedisConnFromContext tries to get a redis connection from the redis
-// database assigned to the context with the "redisdb" key
-// It panics if it cannot get a connection after 3 tries
-// The returned connection has to be .Return()-ed after use
-func GetRedisConnFromContext(ctx context.Context) *redis.Connection {
+// GetFromContext returns a redis.Database from the context, usable with
+// SetupSubscribe and friends
+func GetFromContext(ctx context.Context) *redis.Database {
 	db, ok := ctx.Value("redisdb").(*redis.Database)
 	if !ok {
 		panic("Redis database not found in the context")
 	}
 
-	return GetConn(db)
+	return db
+}
+
+// GetConnFromContext tries to get a redis connection from the redis
+// database assigned to the context with the "redisdb" key
+// It panics if it cannot get a connection after 3 tries
+// The returned connection has to be .Return()-ed after use
+func GetConnFromContext(ctx context.Context) *redis.Connection {
+	return GetConn(GetFromContext(ctx))
 }
 
 // New sets up the redis database with the given arguments, panics if it cannot

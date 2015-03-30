@@ -21,6 +21,7 @@ package subscription
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 
@@ -39,6 +40,8 @@ type Row struct {
 	Endtimestamp   time.Time
 	Timestamp      time.Time
 }
+
+var NonSubErr = errors.New("User is not a subscriber")
 
 func getDBFromContext(ctx context.Context) *sql.DB {
 	db, ok := context.Value("db").(*sql.DB)
@@ -63,7 +66,7 @@ func Init() {
 
 // Subscribed checks if the given userid is a subscriber and returns the tier
 // of the subscription, to differentiate
-func Subscribed(ctx context.Contest, r *http.Request, userid int64) (int, error) {
+func Subscribed(ctx context.Contest, userid int64) (int, error) {
 	db := getDBFromContext(ctx)
 	stmt, err := db.Prepare(`
 		SELECT tier
@@ -78,14 +81,23 @@ func Subscribed(ctx context.Contest, r *http.Request, userid int64) (int, error)
 	if err != nil {
 		d.F("err: %v userid: %v", err, userid)
 	}
+	defer stmt.Close()
 
-	var tier int
-	err = stmt.QueryRow().Scan(&tier)
+	var tier sql.NullInt64
+	err = stmt.QueryRow(userid).Scan(&tier)
 	if err != nil {
 		return 0, err
 	}
 
-	return tier, nil
+	if tier.Valid {
+		return int(tier.Int64), nil
+	}
+
+	// tier not valid, see if the user is a twitch sub or not, if so
+	// the tier will be 0 and error will be nil
+	//return 0, nil
+	return 0, NonSubErr
+
 }
 
 // Add inserts the subscription, modifying all other subscriptions start and end
@@ -96,7 +108,7 @@ func Subscribed(ctx context.Contest, r *http.Request, userid int64) (int, error)
 // to the end)
 // fix up the times of the subscriptions so that no time is lost and the
 // time interval is continous
-func Add(ctx context.Context, r *http.Request, row *Row) {
+func Add(ctx context.Context, row *Row) {
 	db := getDBFromContext(ctx)
 	tx, err := db.Begin()
 	if err != nil {
