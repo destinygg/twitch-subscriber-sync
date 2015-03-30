@@ -36,7 +36,8 @@ type IConn struct {
 	conn net.Conn
 	*irc.Decoder
 	*irc.Encoder
-	cfg *config.TwitchScrape
+	cfg      *config.TwitchScrape
+	Loggedin bool
 	// exponentially increase the time we sleep based on the number of tries
 	// only resets when successfully connected to the server
 	tries float64
@@ -57,6 +58,7 @@ func (c *IConn) Reconnect() {
 		return
 	}
 
+	c.Loggedin = false
 	c.pendingPings = 0
 	c.conn = conn
 	c.Decoder = irc.NewDecoder(conn)
@@ -90,7 +92,9 @@ func (c *IConn) logWithDuration(format string, dur time.Duration, args ...interf
 // Write handles sending messages, it reconnects if there are problems
 func (c *IConn) Write(m *irc.Message) {
 	_ = c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	d.DF(2, "\t> %+v", m)
+	if m.Command != "PING" {
+		d.DF(2, "\t> %+v", m)
+	}
 	if err := c.Encode(m); err != nil {
 		c.delayAndLog("write error: %+v", err)
 		c.Reconnect()
@@ -152,11 +156,11 @@ func Init(ctx context.Context, cb func(*IConn, *irc.Message)) {
 		case irc.PING:
 			c.Write(&irc.Message{Command: irc.PONG, Params: m.Params, Trailing: m.Trailing})
 		case irc.RPL_WELCOME: // successfully connected
+			c.Loggedin = true
 			c.tries = 0
 			c.Write(&irc.Message{Command: irc.JOIN, Params: []string{"#" + cfg.Channel}})
 		default:
 
-			d.DF(1, "\t< %+v", m)
 			cb(c, m)
 		}
 	}

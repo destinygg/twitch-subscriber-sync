@@ -177,7 +177,6 @@ loop:
 	diff := make(map[string]int)
 	visited := make(map[string]struct{}, len(users))
 
-	d.D("got subs:", len(users), users)
 	for _, u := range users {
 		nick := strings.ToLower(u.Name)
 		a.nicksToIDs[nick] = u.ID
@@ -187,12 +186,8 @@ loop:
 		if wassub != 1 && ok { // was not a sub before, but is now
 			a.subs[u.ID] = 1
 			diff[u.ID] = 1
-			d.D("found twitch user", u.Name, "and is now a sub")
 		} else if !ok {
 			diff[u.ID] = 1
-			d.D("not found twitch user", u.Name, "and is a sub")
-		} else {
-			d.D("found twitch user", u.Name, "but already a sub")
 		}
 	}
 
@@ -205,11 +200,9 @@ loop:
 		if wassub == 1 { // was a sub, but is no longer
 			a.subs[id] = 0
 			diff[id] = 0
-			d.D("twitch user with id", id, "is no longer a sub")
 		}
 	}
 
-	d.D("syncing subs:", diff)
 	a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
 	a.mu.Unlock()
 	_ = <-t.C
