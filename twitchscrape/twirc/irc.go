@@ -116,7 +116,6 @@ func (c *IConn) Read() *irc.Message {
 			c.pendingPings--
 		}
 
-		d.DF(2, "\t< %+v", m)
 		return m
 	}
 
@@ -156,6 +155,8 @@ func Init(ctx context.Context, cb func(*IConn, *irc.Message)) {
 			c.tries = 0
 			c.Write(&irc.Message{Command: irc.JOIN, Params: []string{"#" + cfg.Channel}})
 		default:
+
+			d.DF(1, "\t< %+v", m)
 			cb(c, m)
 		}
 	}

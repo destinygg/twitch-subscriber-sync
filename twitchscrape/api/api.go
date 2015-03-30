@@ -152,8 +152,8 @@ func (a *Api) AddSub(nick string) {
 	defer a.mu.Unlock()
 
 	data := struct {
-		nick string
-	}{nick: nick}
+		Nick string `json:"nick"`
+	}{Nick: nick}
 	buf := bytes.Buffer{}
 	enc := json.NewEncoder(&buf)
 	_ = enc.Encode(data)
