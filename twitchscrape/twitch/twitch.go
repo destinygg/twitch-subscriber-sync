@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
@@ -66,9 +65,6 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			ResponseHeaderTimeout: 5 * time.Second,
 		},
 	}
-
-	var err error
-	var users []User
 
 	/*
 	  {
@@ -113,27 +109,29 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			} `json:"user"`
 		} `json:"subscriptions"`
 	}
+	var users []User
 
 	urlStr := t.apibase + "channels/" + t.cfg.Channel + "/subscriptions?limit=100"
-	req, err := http.NewRequest("GET", urlStr, nil)
-	if err != nil {
-		d.F("Failed to create request, err: %+v", req, err)
-	}
-	req.Header.Add("Accept", "application/vnd.twitchtv.v3+json")
-	req.Header.Add("Authorization", "OAuth "+t.cfg.OAuthToken)
 
 	for {
+		req, err := http.NewRequest("GET", urlStr, nil)
+		if err != nil {
+			d.F("Failed to create request, err: %+v", req, err)
+		}
+		req.Header.Add("Accept", "application/vnd.twitchtv.v3+json")
+		req.Header.Add("Authorization", "OAuth "+t.cfg.OAuthToken)
+
 		res, err := client.Do(req)
 		if err != nil || res.StatusCode != 200 {
 			d.P("Failed to GET the subscribers, req, err", req, err)
 			return nil, err
 		}
 
-		dec := json.NewDecoder(res.Body)
-		err = dec.Decode(&js)
-		defer res.Body.Close()
+		body, _ := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+
+		err = json.Unmarshal(body, &js)
 		if err != nil {
-			body, _ := ioutil.ReadAll(res.Body)
 			d.P("Failed to decode json, err", err, string(body))
 			return nil, err
 		}
@@ -155,11 +153,6 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
-		u, err := url.Parse(js.Links.Next)
-		if err != nil {
-			d.F("Failed to parse url, url was: %s, err: %+v", js.Links.Next, err)
-		}
-
-		req.URL = u
+		urlStr = js.Links.Next
 	}
 }

@@ -124,8 +124,7 @@ func (a *Api) getSubs() {
 }
 
 func (a *Api) fromNick(nick string) string {
-	nick = strings.ToLower(nick)
-	if id, ok := a.nicksToIDs[nick]; ok {
+	if id, ok := a.nicksToIDs[strings.ToLower(nick)]; ok {
 		return id
 	} else {
 		d.DF(2, "Could not find the ID of the twitch user %v", nick)
@@ -181,8 +180,7 @@ func (a *Api) run(tw *twitch.Twitch) {
 			visited := make(map[string]struct{}, len(users))
 
 			for _, u := range users {
-				nick := strings.ToLower(u.Name)
-				a.nicksToIDs[nick] = u.ID
+				a.nicksToIDs[strings.ToLower(u.Name)] = u.ID
 				visited[u.ID] = struct{}{}
 
 				wassub, ok := a.subs[u.ID]
