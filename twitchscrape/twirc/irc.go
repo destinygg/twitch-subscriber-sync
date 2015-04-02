@@ -92,7 +92,7 @@ func (c *IConn) logWithDuration(format string, dur time.Duration, args ...interf
 // Write handles sending messages, it reconnects if there are problems
 func (c *IConn) Write(m *irc.Message) {
 	_ = c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	if m.Command != "PING" {
+	if m.Command != "PING" && m.Command != "PONG" {
 		d.DF(2, "\t> %+v", m)
 	}
 	if err := c.Encode(m); err != nil {

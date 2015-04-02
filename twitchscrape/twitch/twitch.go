@@ -24,6 +24,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -122,16 +123,19 @@ func (t *Twitch) GetSubs() []User {
 	req.Header.Add("Authorization", "OAuth "+t.cfg.OAuthToken)
 
 	for {
-		resp, err := client.Do(req)
+		res, err := client.Do(req)
 		if err != nil {
-			d.F("Failed to GET the subscribers, req: %+v, err: %+v", req, err)
+			d.P("Failed to GET the subscribers, req, err", req, err)
+			return users
 		}
 
-		dec := json.NewDecoder(resp.Body)
+		dec := json.NewDecoder(res.Body)
 		err = dec.Decode(&js)
-		_ = resp.Body.Close()
+		defer res.Body.Close()
 		if err != nil {
-			d.F("Failed to decode json, err: %+v", err)
+			body, _ := ioutil.ReadAll(res.Body)
+			d.P("Failed to decode json, err", err, string(body))
+			return users
 		}
 
 		if users == nil {
