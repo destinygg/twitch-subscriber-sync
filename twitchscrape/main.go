@@ -75,7 +75,6 @@ func main() {
 
 		switch m.Command {
 		case irc.PRIVMSG:
-			d.DF(1, "\t< %+v", m)
 			if nick, resub := getNewSubNick(m); nick != "" {
 				if resub {
 					a.ReSub(nick)

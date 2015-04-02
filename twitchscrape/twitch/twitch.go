@@ -58,7 +58,7 @@ func GetFromContext(ctx context.Context) *Twitch {
 	return cfg
 }
 
-func (t *Twitch) GetSubs() []User {
+func (t *Twitch) GetSubs() ([]User, error) {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -124,9 +124,9 @@ func (t *Twitch) GetSubs() []User {
 
 	for {
 		res, err := client.Do(req)
-		if err != nil {
+		if err != nil || res.StatusCode != 200 {
 			d.P("Failed to GET the subscribers, req, err", req, err)
-			return users
+			return nil, err
 		}
 
 		dec := json.NewDecoder(res.Body)
@@ -135,7 +135,7 @@ func (t *Twitch) GetSubs() []User {
 		if err != nil {
 			body, _ := ioutil.ReadAll(res.Body)
 			d.P("Failed to decode json, err", err, string(body))
-			return users
+			return nil, err
 		}
 
 		if users == nil {
@@ -143,7 +143,7 @@ func (t *Twitch) GetSubs() []User {
 		}
 
 		if len(js.Subs) == 0 {
-			return users
+			return users, nil
 		}
 
 		for _, s := range js.Subs {

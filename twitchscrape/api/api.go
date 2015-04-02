@@ -170,41 +170,45 @@ func (a Api) syncSubs(subs map[string]int, url string) {
 func (a *Api) run(tw *twitch.Twitch) {
 	t := time.NewTicker(time.Duration(a.cfg.PollMinutes) * time.Minute)
 
-loop:
-	a.mu.Lock()
-	a.getSubs()
-	users := tw.GetSubs()
-	diff := make(map[string]int)
-	visited := make(map[string]struct{}, len(users))
+	for {
+		a.mu.Lock()
+		a.getSubs()
+		users, err := tw.GetSubs()
+		// can only decide the list of unsubs if GetSubs returns no error and
+		// as such, returns every single sub
+		if err == nil {
+			diff := make(map[string]int)
+			visited := make(map[string]struct{}, len(users))
 
-	for _, u := range users {
-		nick := strings.ToLower(u.Name)
-		a.nicksToIDs[nick] = u.ID
-		visited[u.ID] = struct{}{}
+			for _, u := range users {
+				nick := strings.ToLower(u.Name)
+				a.nicksToIDs[nick] = u.ID
+				visited[u.ID] = struct{}{}
 
-		wassub, ok := a.subs[u.ID]
-		if wassub != 1 && ok { // was not a sub before, but is now
-			a.subs[u.ID] = 1
-			diff[u.ID] = 1
-		} else if !ok {
-			diff[u.ID] = 1
+				wassub, ok := a.subs[u.ID]
+				if wassub != 1 && ok { // was not a sub before, but is now
+					a.subs[u.ID] = 1
+					diff[u.ID] = 1
+				} else if !ok {
+					diff[u.ID] = 1
+				}
+			}
+
+			// now check for expired subs
+			for id, wassub := range a.subs {
+				if _, ok := visited[id]; ok { // already seen, has to be a sub
+					continue
+				}
+
+				if wassub == 1 { // was a sub, but is no longer
+					a.subs[id] = 0
+					diff[id] = 0
+				}
+			}
+
+			a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
 		}
+		a.mu.Unlock()
+		_ = <-t.C
 	}
-
-	// now check for expired subs
-	for id, wassub := range a.subs {
-		if _, ok := visited[id]; ok { // already seen, has to be a sub
-			continue
-		}
-
-		if wassub == 1 { // was a sub, but is no longer
-			a.subs[id] = 0
-			diff[id] = 0
-		}
-	}
-
-	a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
-	a.mu.Unlock()
-	_ = <-t.C
-	goto loop
 }
