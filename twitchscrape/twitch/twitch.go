@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
@@ -112,18 +114,27 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	var users []User
 
 	urlStr := t.apibase + "channels/" + t.cfg.Channel + "/subscriptions?limit=100"
+	req, err := http.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		d.F("Failed to create request, err: %+v", req, err)
+	}
+	req.Header.Add("Accept", "application/vnd.twitchtv.v3+json")
+	req.Header.Add("Authorization", "OAuth "+t.cfg.OAuthToken)
 
 	for {
-		req, err := http.NewRequest("GET", urlStr, nil)
-		if err != nil {
-			d.F("Failed to create request, err: %+v", req, err)
-		}
-		req.Header.Add("Accept", "application/vnd.twitchtv.v3+json")
-		req.Header.Add("Authorization", "OAuth "+t.cfg.OAuthToken)
-
+	again:
 		res, err := client.Do(req)
+		// TODO fix this when https://github.com/golang/go/issues/9405 is out
+		if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+			d.P("use of closed netconn, retrying")
+			goto again
+		}
+
 		if err != nil || res.StatusCode != 200 {
-			d.P("Failed to GET the subscribers, req, err", req, err)
+			if err == nil {
+				err = fmt.Errorf("non-200 statuscode received from twitch")
+			}
+			d.P("Failed to GET the subscribers, res, err", res, err)
 			return nil, err
 		}
 
@@ -153,6 +164,11 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
-		urlStr = js.Links.Next
+		u, err := url.Parse(js.Links.Next)
+		if err != nil {
+			d.F("unable to parse url", js.Links.Next)
+		}
+
+		req.URL = u
 	}
 }
