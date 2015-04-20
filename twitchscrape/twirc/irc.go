@@ -92,9 +92,6 @@ func (c *IConn) logWithDuration(format string, dur time.Duration, args ...interf
 // Write handles sending messages, it reconnects if there are problems
 func (c *IConn) Write(m *irc.Message) {
 	_ = c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	if m.Command != "PING" && m.Command != "PONG" {
-		d.DF(2, "\t> %+v", m)
-	}
 	if err := c.Encode(m); err != nil {
 		c.delayAndLog("write error: %+v", err)
 		c.Reconnect()
@@ -156,6 +153,7 @@ func Init(ctx context.Context, cb func(*IConn, *irc.Message)) {
 		case irc.PING:
 			c.Write(&irc.Message{Command: irc.PONG, Params: m.Params, Trailing: m.Trailing})
 		case irc.RPL_WELCOME: // successfully connected
+			d.PF(1, "Successfully connected to IRC")
 			c.Loggedin = true
 			c.tries = 0
 			c.Write(&irc.Message{Command: irc.JOIN, Params: []string{"#" + cfg.Channel}})

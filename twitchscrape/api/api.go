@@ -79,7 +79,6 @@ func (a *Api) call(method, url string, body io.Reader) (data []byte, err error) 
 	}
 
 	res, err := a.client.Do(req)
-	d.DF(2, "Req: %#v\nRes: %#v\n err: %#v\n\n", req, res, err)
 	if res.Body == nil {
 		return nil, nil
 	}
@@ -138,10 +137,13 @@ func (a *Api) ReSub(nick string) {
 	defer a.mu.Unlock()
 
 	if id := a.fromNick(nick); id != "" {
+		d.DF(1, "Resubbing: %v (%v)", nick, id)
 		a.subs[id] = 1
 
 		d := map[string]int{id: 1}
 		a.syncSubs(d, a.cfg.TwitchScrape.ReSubURL)
+	} else {
+		d.DF(1, "Failed to resub: %v (not found on d.gg)", nick)
 	}
 }
 
@@ -149,6 +151,7 @@ func (a *Api) ReSub(nick string) {
 func (a *Api) AddSub(nick string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	d.DF(1, "Adding sub: %v", nick)
 
 	data := struct {
 		Nick string `json:"nick"`
@@ -187,12 +190,13 @@ func (a *Api) run(tw *twitch.Twitch) {
 				if wassub != 1 && ok { // was not a sub before, but is now
 					a.subs[u.ID] = 1
 					diff[u.ID] = 1
-				} else if !ok {
+				} else if !ok { // was not found at all, but could have registered since
 					diff[u.ID] = 1
 				}
 			}
 
-			// now check for expired subs
+			// now check for expired subs, expired var is purely for logging reasons
+			var expired int
 			for id, wassub := range a.subs {
 				if _, ok := visited[id]; ok { // already seen, has to be a sub
 					continue
@@ -201,9 +205,12 @@ func (a *Api) run(tw *twitch.Twitch) {
 				if wassub == 1 { // was a sub, but is no longer
 					a.subs[id] = 0
 					diff[id] = 0
+					expired++
 				}
 			}
 
+			// report the difference from the known d.gg subs always
+			d.DF(1, "Found %v subs, syncing: %v, number of expired/notfound subs: %v", len(users), len(diff), expired)
 			a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
 		}
 		a.mu.Unlock()

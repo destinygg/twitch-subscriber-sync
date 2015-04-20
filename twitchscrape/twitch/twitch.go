@@ -61,10 +61,10 @@ func GetFromContext(ctx context.Context) *Twitch {
 
 func (t *Twitch) GetSubs() ([]User, error) {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig:       &tls.Config{},
-			ResponseHeaderTimeout: 5 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
 		},
 	}
 

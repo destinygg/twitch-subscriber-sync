@@ -20,6 +20,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
 	"github.com/destinygg/website2/internal/redis"
@@ -28,6 +30,7 @@ import (
 )
 
 func main() {
+	time.Local = time.UTC
 	ctx := context.Background()
 	ctx = config.Init(ctx)
 	ctx = smtp.Init(ctx)

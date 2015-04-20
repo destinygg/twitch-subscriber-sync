@@ -37,6 +37,7 @@ import (
 func main() {
 	// TODO handle syncing of bans PRIVMSG #destiny :.unban username
 	// TODO creation date of subs (need to do it everywhere at the same time)
+	time.Local = time.UTC
 	ctx := context.Background()
 	ctx = config.Init(ctx)
 
@@ -94,7 +95,6 @@ func getNewSubNick(m *irc.Message) (nick string, resub bool) {
 	}
 
 	match := subRe.FindStringSubmatch(m.Trailing)
-	d.DF(1, "< MATCHED %+v, %+v", match, m)
 	if len(match) < 2 {
 		return
 	}
