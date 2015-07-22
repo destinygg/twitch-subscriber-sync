@@ -37,6 +37,7 @@ import (
 func main() {
 	// TODO handle syncing of bans PRIVMSG #destiny :.unban username
 	// TODO creation date of subs (need to do it everywhere at the same time)
+	// TODO https://github.com/justintv/Twitch-API/blob/master/chat/capabilities.md
 	time.Local = time.UTC
 	ctx := context.Background()
 	ctx = config.Init(ctx)

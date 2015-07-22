@@ -24,10 +24,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
@@ -113,37 +112,56 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	}
 	var users []User
 
+	// the starting url
 	urlStr := t.apibase + "channels/" + t.cfg.Channel + "/subscriptions?limit=100"
-	req, err := http.NewRequest("GET", urlStr, nil)
-	if err != nil {
-		d.F("Failed to create request, err: %+v", req, err)
+	// the request headers for reuse
+	headers := http.Header{
+		"Accept":        []string{"application/vnd.twitchtv.v3+json"},
+		"Authorization": []string{"OAuth " + t.cfg.OAuthToken},
 	}
-	req.Header.Add("Accept", "application/vnd.twitchtv.v3+json")
-	req.Header.Add("Authorization", "OAuth "+t.cfg.OAuthToken)
 
 	for {
 	again:
-		res, err := client.Do(req)
-		// TODO fix this when https://github.com/golang/go/issues/9405 is out
-		if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
-			d.P("use of closed netconn, retrying")
-			goto again
+		var err error
+		var res *http.Response
+		{
+			u, err := url.Parse(urlStr)
+			if err != nil {
+				d.P("could not parse url", urlStr)
+				return nil, err
+			}
+			res, err = client.Do(&http.Request{
+				Method:     "GET",
+				URL:        u,
+				Proto:      "HTTP/1.1",
+				ProtoMajor: 1,
+				ProtoMinor: 1,
+				Header:     headers,
+				Body:       nil,
+				Host:       u.Host,
+			})
+		}
+
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+				d.P("temporary http error, retrying", urlStr)
+				goto again
+			}
 		}
 
 		if err != nil || res.StatusCode != 200 {
 			if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")
 			}
-			d.P("Failed to GET the subscribers, res, err", res, err)
+			d.P("Failed to GET the subscribers, url, res, err", urlStr, res, err)
 			return nil, err
 		}
 
-		body, _ := ioutil.ReadAll(res.Body)
+		dec := json.NewDecoder(res.Body)
+		err = dec.Decode(&js)
 		res.Body.Close()
-
-		err = json.Unmarshal(body, &js)
 		if err != nil {
-			d.P("Failed to decode json, err", err, string(body))
+			d.P("Failed to decode json, err", err)
 			return nil, err
 		}
 
@@ -164,11 +182,6 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
-		u, err := url.Parse(js.Links.Next)
-		if err != nil {
-			d.F("unable to parse url", js.Links.Next)
-		}
-
-		req.URL = u
+		urlStr = js.Links.Next
 	}
 }

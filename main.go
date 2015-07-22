@@ -23,8 +23,6 @@ import (
 	"time"
 
 	"github.com/destinygg/website2/internal/config"
-	"github.com/destinygg/website2/internal/debug"
-	"github.com/destinygg/website2/internal/redis"
 	"github.com/destinygg/website2/internal/smtp"
 	"golang.org/x/net/context"
 )
