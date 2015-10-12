@@ -1,25 +1,15 @@
 package db
 
 import (
-	"database/sql"
-
 	"github.com/destinygg/website2/internal/config"
-	"github.com/destinygg/website2/internal/debug"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/net/context"
 )
 
 func Init(ctx context.Context) context.Context {
 	cfg := config.GetFromContext(ctx)
-	db, err := sql.Open("mysql", cfg.Database.DSN)
-	if err != nil {
-		d.F("Could not open database: %#v", err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		d.F("Could not connect to database: %#v", err)
-	}
+	db := sqlx.MustConnect("mysql", cfg.Database.DSN)
 
 	db.SetMaxIdleConns(cfg.Database.MaxIdleConnections)
 	db.SetMaxOpenConns(cfg.Database.MaxConnections)
@@ -27,8 +17,8 @@ func Init(ctx context.Context) context.Context {
 	return context.WithValue(ctx, "db", db)
 }
 
-func GetFromContext(ctx context.Context) *sql.DB {
-	db, ok := ctx.Value("db").(*sql.DB)
+func GetFromContext(ctx context.Context) *sqlx.DB {
+	db, ok := ctx.Value("db").(*sqlx.DB)
 	if !ok {
 		panic("SQL database not found in the context")
 	}

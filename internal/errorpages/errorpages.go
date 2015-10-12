@@ -17,32 +17,41 @@
   along with destinygg/errorpages; If not, see <http://www.gnu.org/licenses/>.
 ***/
 
-package erp
+package errorpages
 
 import (
 	"fmt"
 	"net/http"
 
 	"github.com/destinygg/website2/internal/debug"
+	"golang.org/x/net/context"
 )
 
-func AuthRequired(w http.ResponseWriter, r *http.Request) {
+func AuthRequired(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	// TODO with a proper template and shit
 	http.Error(w, "authentication required", http.StatusForbidden)
 }
 
-func BadRequest(w http.ResponseWriter, r *http.Request) {
+func BadRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	// TODO proper template again
 	http.Error(w, "bad parameters", http.StatusBadRequest)
 }
 
-func Recover(reason interface{}, w http.ResponseWriter, r *http.Request) {
+// InternalError accepts a struct to pass to the template with information about
+// the error
+func InternalError(ctx context.Context, w http.ResponseWriter, r *http.Request, nfo interface{}) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusInternalServerError)
+	// TODO template
+	fmt.Fprint(w, nfo)
+}
+
+func Recover(ctx context.Context, w http.ResponseWriter, r *http.Request, reason interface{}) {
+
 	// TODO get a stack trace and as much info as possible, save it under some
 	// key and show the user only that key
 	// also possibly email about the error
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusInternalServerError)
 
 	err := d.NewErrorTrace(5, reason)
-	fmt.Fprint(w, err.Error())
+	InternalError(ctx, w, r, err.Error())
 }

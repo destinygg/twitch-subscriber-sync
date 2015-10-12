@@ -6,7 +6,7 @@ import (
 	"github.com/destinygg/website2/internal/db"
 	"github.com/destinygg/website2/internal/debug"
 	"github.com/destinygg/website2/internal/redis"
-	"github.com/tideland/godm/v3/redis"
+	"github.com/tideland/golib/redis"
 	"golang.org/x/net/context"
 )
 

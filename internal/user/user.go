@@ -30,16 +30,26 @@ import (
 	"golang.org/x/net/context"
 )
 
+var sessioncookie = regexp.MustCompile(`^[a-z0-9]{10, 30}$`)
+var contextKey *int
+var ErrNotFound = fmt.Errorf("user: session not found")
+
+func init() {
+	contextKey = new(int)
+}
+
 type User struct {
 	Username string
 	Userid   int64
 	Features []string
 }
 
-var sessioncookie = regexp.MustCompile(`^[a-z0-9]{10, 30}$`)
+func (u *User) StoreInContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, contextKey, u)
+}
 
 func GetFromContext(ctx context.Context) (*User, bool) {
-	u, ok := ctx.Value("user").(*User)
+	u, ok := ctx.Value(contextKey).(*User)
 	if !ok {
 		return nil, ok
 	}
@@ -48,6 +58,13 @@ func GetFromContext(ctx context.Context) (*User, bool) {
 }
 
 func GetFromRequest(ctx context.Context, r *http.Request) (*User, error) {
+	return getFromRedis(ctx, r, "CHAT:session-%v")
+}
+func getAdminFromRequest(ctx context.Context, r *http.Request) (*User, error) {
+	return getFromRedis(ctx, r, "CHAT:adminsession-%v")
+}
+
+func getFromRedis(ctx context.Context, r *http.Request, keyfmt string) {
 	sessionid, err := r.Cookie("sid")
 	if err != nil || !sessioncookie.MatchString(sessionid.Value) {
 		// not an error, dont log it
@@ -55,9 +72,12 @@ func GetFromRequest(ctx context.Context, r *http.Request) (*User, error) {
 	}
 
 	conn := rds.GetRedisConnFromContext(ctx)
-	authdata, err := rds.GetBytes(conn, fmt.Sprintf("CHAT:session-%v", sessionid.Value))
+	defer conn.Return()
+
+	rk := fmt.Sprintf(keyfmt, sessionid.Value)
+	authdata, err := rds.GetBytes(conn, rk)
 	if err != nil || len(authdata) == 0 {
-		return nil, fmt.Errorf("No sessiondata found |%v| |%v|", err, authdata)
+		return nil, ErrNotFound
 	}
 
 	var tu struct {
@@ -68,12 +88,12 @@ func GetFromRequest(ctx context.Context, r *http.Request) (*User, error) {
 
 	err = json.Unmarshal(authdata, &tu)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal sessiondata |%v| |%v|", err, authdata)
+		return nil, fmt.Errorf("Failed to unmarshal session %v |%v| |%v|", rk, err, authdata)
 	}
 
 	uid, err := strconv.ParseInt(tu.Userid, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse number |%v| |%v|", err, tu.Userid)
+		return nil, fmt.Errorf("Failed to parse number for session %v |%v| |%v|", rk, err, tu.Userid)
 	}
 
 	u := &User{

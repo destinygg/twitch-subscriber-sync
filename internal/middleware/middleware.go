@@ -25,34 +25,59 @@ import (
 	"github.com/destinygg/website2/internal/debug"
 	"github.com/destinygg/website2/internal/errorpages"
 	"github.com/destinygg/website2/internal/user"
-	"github.com/guregu/kami"
 	"golang.org/x/net/context"
 )
 
-func Auth(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
-	u, err := user.GetFromRequest(ctx, r)
-	if u == nil {
-		if err != nil {
-			d.D(err)
+func Auth(n chain.Handler) chain.Handler {
+	return chain.HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+		u, err := user.GetFromRequest(ctx, r)
+		if u == nil {
+			// we do not care about the session not found error, all others
+			// are interesting though, so log them
+			if err != nil && err != user.ErrNotFound {
+				d.D(err)
+				errorpages.InternalError(ctx, w, r, struct {
+					Err error
+				}{
+					Err: err,
+				})
+			} else {
+				errorpages.AuthRequired(ctx, w, r)
+			}
+		} else {
+			ctx = context.WithValue(ctx, user.ContextKey, u)
+			n.ServeHTTPContext(ctx, w, r)
 		}
-
-		erp.AuthRequired(w, r)
-		return ctx
-	} else {
-		return context.WithValue(ctx, "user", u)
-	}
+	})
 }
 
-func AdminAuth(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
-	// TODO
-	return ctx
+func AdminAuth(n chain.Handler) chain.Handler {
+	return chain.HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+		u, err := user.GetAdminFromRequest(ctx, r)
+		if u == nil {
+			if err != nil {
+				d.D(err)
+			}
+
+			errorpages.AdminAuthRequired(ctx, w, r)
+		} else {
+			ctx = u.StoreInContext(ctx)
+			n.ServeHTTPContext(ctx, w, r)
+		}
+	})
 }
 
-func RegisterPanicHandler() {
-	kami.PanicHandler = recover
-}
+func Panic(n chain.Handler) chain.Handler {
+	return chain.HandlerFunc(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			reason := recover()
+			if reason == nil {
+				return
+			}
 
-func recover(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	reason := kami.Exception(ctx)
-	erp.Recover(reason, w, r)
+			errorpages.Recover(ctx, w, r, reason)
+		}()
+
+		n.ServeHTTPContext(ctx, w, r)
+	})
 }

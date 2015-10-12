@@ -44,6 +44,14 @@ type User struct {
 	Created time.Time
 }
 
+var client = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		TLSClientConfig:       &tls.Config{},
+		ResponseHeaderTimeout: 30 * time.Second,
+	},
+}
+
 func Init(ctx context.Context) context.Context {
 	tw := &Twitch{
 		cfg:     &config.GetFromContext(ctx).TwitchScrape,
@@ -59,14 +67,6 @@ func GetFromContext(ctx context.Context) *Twitch {
 }
 
 func (t *Twitch) GetSubs() ([]User, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig:       &tls.Config{},
-			ResponseHeaderTimeout: 30 * time.Second,
-		},
-	}
-
 	/*
 	  {
 	    "_total": 286,
@@ -121,7 +121,6 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	}
 
 	for {
-	again:
 		var err error
 		var res *http.Response
 		{
@@ -145,7 +144,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
 				d.P("temporary http error, retrying", urlStr)
-				goto again
+				continue
 			}
 		}
 

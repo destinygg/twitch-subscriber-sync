@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/destinygg/website2/internal/debug"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/net/context"
 )
 
@@ -43,8 +44,8 @@ type Row struct {
 
 var NonSubErr = errors.New("User is not a subscriber")
 
-func getDBFromContext(ctx context.Context) *sql.DB {
-	db, ok := context.Value("db").(*sql.DB)
+func getDBFromContext(ctx context.Context) *sqlx.DB {
+	db, ok := context.Value("db").(*sqlx.DB)
 	if !ok {
 		panic("Database not found in the context")
 	}
@@ -151,7 +152,7 @@ func getActiveSubs(tx *sql.Tx, userid int64) (rows []*Row) {
 		}
 	})()
 
-	cursor, err := tx.Query(`
+	cursor, err := tx.Queryx(`
 		SELECT
 			id,
 			donationid,
@@ -178,16 +179,7 @@ func getActiveSubs(tx *sql.Tx, userid int64) (rows []*Row) {
 		}
 
 		var row Row
-		err = cursor.Scan(
-			&row.ID,
-			&row.Donationid,
-			&row.Fromuserid,
-			&row.Targetuserid,
-			&row.Tier,
-			&row.Starttimestamp,
-			&row.Endtimestamp,
-			&row.Timestamp,
-		)
+		err = cursor.StructScan(&row)
 		if err != nil {
 			return
 		}

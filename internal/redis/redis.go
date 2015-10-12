@@ -25,7 +25,7 @@ import (
 
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
-	"github.com/tideland/godm/v3/redis"
+	"github.com/tideland/golib/redis"
 	"golang.org/x/net/context"
 )
 
@@ -103,7 +103,9 @@ func RunScript(conn *redis.Connection, hash string, args ...interface{}) (*redis
 	return conn.Do("EVALSHA", t...)
 }
 
-func pubsubchan(db *redis.Database, channel string) string {
+// PubSubChan is a simple helper for generating channel name based on
+// database index
+func PubSubChan(db *redis.Database, channel string) string {
 	opt := db.Options()
 	return fmt.Sprintf("%s-%d", channel, opt.Index)
 }
@@ -120,7 +122,7 @@ again:
 		goto again
 	}
 
-	err = sub.Subscribe(pubsubchan(db, channel))
+	err = sub.Subscribe(PubSubChan(db, channel))
 	if err != nil {
 		goto again
 	}
@@ -142,7 +144,11 @@ again:
 // Publish sends to the channel
 func Publish(db *redis.Database, channel string, msg []byte) error {
 	conn := GetConn(db)
-	_, err := conn.Do("PUBLISH", pubsubchan(db, channel), msg)
+	_, err := conn.Do("PUBLISH", PubSubChan(db, channel), msg)
+	if err == nil {
+		err = conn.Return()
+	}
+
 	return err
 }
 

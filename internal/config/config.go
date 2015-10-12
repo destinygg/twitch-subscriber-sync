@@ -22,9 +22,11 @@ package config
 import (
 	"flag"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
-	"code.google.com/p/gcfg"
+	"github.com/naoina/toml"
 	"golang.org/x/net/context"
 )
 
@@ -32,7 +34,7 @@ type Website struct {
 	Addr          string
 	BaseHost      string
 	CDNHost       string
-	PrivateAPIKey []string
+	PrivateAPIKey string
 }
 
 type Debug struct {
@@ -98,14 +100,12 @@ type AppConfig struct {
 	TwitchScrape
 }
 
-var settingsFile = flag.String("config", "settings.cfg", `path to the config file, it it doesn't exist it will
-		be created with default values`)
+var settingsFile *string
 
 const sampleconf = `[website]
 addr=:80
 basehost=www.destiny.gg
 cdnhost=cdn.destiny.gg
-# can specify api keys multiple times
 privateapikey=keepitsecret
 
 [debug]
@@ -134,8 +134,9 @@ addr=
 username=
 password=
 fromemail=
-# where to send error emails to, if there are multiple logemail= lines every one
-# of them will receive the emails
+# where to send error emails to, if there are multiple, every one  of them will
+# receive the emails, use array notation aka
+# logemail=["firstemail@domain.tld", "secondemail@domain.tld"]
 logemail=
 
 [metrics]
@@ -160,7 +161,10 @@ channel=destiny
 `
 
 func Init(ctx context.Context) context.Context {
+	settingsFile = flag.String("config", "settings.cfg", `path to the config file, it it doesn't exist it will
+			be created with default values`)
 	flag.Parse()
+
 	f, err := os.OpenFile(*settingsFile, os.O_CREATE|os.O_RDWR, 0660)
 	if err != nil {
 		panic("Could not open " + *settingsFile + " err: " + err.Error())
@@ -173,17 +177,46 @@ func Init(ctx context.Context) context.Context {
 		f.Seek(0, 0)
 	}
 
-	cfg := ReadConfig(f)
-	return context.WithValue(ctx, "appconfig", cfg)
-}
-
-func ReadConfig(f *os.File) *AppConfig {
-	ret := &AppConfig{}
-	if err := gcfg.ReadInto(ret, f); err != nil {
+	cfg := &AppConfig{}
+	if err := ReadConfig(f, cfg); err != nil {
 		panic("Failed to parse config file, err: " + err.Error())
 	}
 
-	return ret
+	return context.WithValue(ctx, "appconfig", cfg)
+}
+
+func ReadConfig(r io.Reader, d interface{}) error {
+	dec := toml.NewDecoder(r)
+	return dec.Decode(d)
+}
+
+func WriteConfig(w io.Writer, d interface{}) error {
+	enc := toml.NewEncoder(w)
+	return enc.Encode(d)
+}
+
+func Save(ctx context.Context) error {
+	return SafeSave(*settingsFile, GetFromContext(ctx))
+}
+
+func SafeSave(file string, data interface{}) error {
+	dir, err := filepath.Abs(filepath.Dir(file))
+	if err != nil {
+		return err
+	}
+
+	f, err := ioutil.TempFile(dir, "tmpconf-")
+	if err != nil {
+		return err
+	}
+
+	err = WriteConfig(f, data)
+	if err != nil {
+		return err
+	}
+	_ = f.Close()
+
+	return os.Rename(f.Name(), file)
 }
 
 func GetFromContext(ctx context.Context) *AppConfig {

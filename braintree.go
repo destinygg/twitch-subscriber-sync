@@ -27,10 +27,7 @@ import (
 	"net/http"
 
 	"github.com/destinygg/website2/internal/config"
-	"github.com/destinygg/website2/internal/debug"
-	"github.com/destinygg/website2/internal/errorpages"
 	"github.com/destinygg/website2/internal/user"
-	"github.com/lionelbarrow/braintree-go"
 	"golang.org/x/net/context"
 )
 
@@ -92,5 +89,7 @@ func CreateSubscription(u *user.User, typ string) {
 	// then either create a transaction or a subscription that is recurring
 	// signal in the transaction that its ?recurring? and to auto submit_for_settlement
 	// and store_in_vault_on_success and the customer id
-	// if paymentmethodnonce is present, its a paypal payment, identified by email, do we get that back?
+	// if paymentmethodnonce is present, its a paypal payment, identified by email, we get that back
+	// recurring subs need a pre-created plan to associate with, the price can be
+	// overriden, it doesnt matter
 }
