@@ -80,6 +80,9 @@ func (s *state) init() {
 			panic("Unable to init blacklist, err: " + err.Error())
 		}
 	}
+	for _, v := range s.Offenses {
+		s.numOffenses[v.Nick] = v.Count
+	}
 }
 
 func (s *state) save() {

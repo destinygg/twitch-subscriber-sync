@@ -208,7 +208,7 @@ var adminCommands = map[string]func(*state, []byte) error{
 		if n, ok := s.numOffenses[nick]; ok {
 			s.numOffenses[nick] = 0
 			s.save()
-			return sendMessage(s.conn, fmt.Sprintf("Reset %s had %d offenses Hhhehhehe", nick, n))
+			return sendMessage(s.conn, fmt.Sprintf("Reset %s, had %d offenses Hhhehhehe", nick, n))
 		}
 
 		return sendMessage(s.conn, "Not found")
