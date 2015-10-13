@@ -30,7 +30,16 @@ again:
 		goto again
 	}
 	c.SetPingHandler(func(m string) error {
-		c.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		now := time.Now()
+
+		// clean up the nuked nicks here
+		for n, t := range s.nukedNicks {
+			if now.Before(t.Add(1 * time.Hour)) {
+				delete(s.nukedNicks, n)
+			}
+		}
+
+		c.SetWriteDeadline(now.Add(5 * time.Second))
 		return c.WriteMessage(websocket.PongMessage, []byte(m))
 	})
 	c.SetPongHandler(func(m string) error {
@@ -91,6 +100,7 @@ func handleMessage(s *state, msg *inMessage) error {
 		}
 	}
 
+	s.logChatMsg(msg.Nick, msg.Data)
 	for re, dur := range s.blacklist {
 		if re.MatchString(msg.Data) {
 			// make the offenses scale
@@ -137,26 +147,37 @@ func handleAdminMessage(s *state, msg []byte) error {
 }
 
 var adminRE = regexp.MustCompile("(?i)^.*[\"`](.+)[\"`].*?([\\da-z]+)?")
+
+func compileRegexp(s *state, line []byte) (*regexp.Regexp, interface{}, error) {
+	m := adminRE.FindSubmatch(line)
+	if len(m) == 0 {
+		return nil, 0, nil
+	}
+
+	rs := string(m[1])
+	re, err := regexp.Compile(rs)
+	if err != nil {
+		return nil, 0, nil
+	}
+
+	var dur string
+	if len(m[2]) > 0 {
+		dur = string(m[2])
+	} else {
+		dur = s.Blacklist.DefaultDuration
+	}
+
+	re.Longest()
+	return re, dur, nil
+}
+
 var adminCommands = map[string]func(*state, []byte) error{
 	"addregexp": func(s *state, arg []byte) error {
-		m := adminRE.FindSubmatch(arg)
-		if len(m) == 0 {
-			return nil
-		}
-
-		re := string(m[1])
-		var dur string
-		if len(m[2]) > 0 {
-			dur = string(m[2])
-		} else {
-			dur = s.Blacklist.DefaultDuration
-		}
-
-		err := s.addBlacklist(re, dur)
+		re, dur, err := compileRegexp(s, arg)
 		if err != nil {
 			return sendMessage(s.conn, "Unable to parse regexp, err: "+err.Error())
 		}
-
+		s.addBlacklist(re, dur)
 		s.save()
 		return sendMessage(s.conn, "Done")
 	},
@@ -212,6 +233,38 @@ var adminCommands = map[string]func(*state, []byte) error{
 		}
 
 		return sendMessage(s.conn, "Not found")
+	},
+	"regexpnuke": func(s *state, arg []byte) error {
+		re, dur, err := compileRegexp(s, arg)
+		if err != nil {
+			return sendMessage(s.conn, "Unable to parse regexp, err: "+err.Error())
+		}
+
+		d := dur.(uint64)
+		now := time.Now()
+		for _, v := range s.lastMsgs {
+			if !re.MatchString(v.msg) {
+				continue
+			}
+
+			err := sendMute(s.conn, v.nick, d)
+			if err != nil {
+				return err
+			}
+
+			s.nukedNicks[v.nick] = now
+		}
+		return nil
+	},
+	"regexpaegis": func(s *state, arg []byte) error {
+		for nick := range s.nukedNicks {
+			err := sendUnmute(s.conn, nick)
+			if err != nil {
+				return err
+			}
+			delete(s.nukedNicks, nick)
+		}
+		return nil
 	},
 }
 

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/destinygg/website2/internal/config"
 	"github.com/gorilla/websocket"
@@ -17,12 +18,19 @@ type Offense struct {
 	Nick  string `toml:"nick"`
 	Count uint64 `toml:"count"`
 }
+type chatMsg struct {
+	nick string
+	msg  string
+}
 
 type state struct {
 	headers     http.Header
 	blacklist   map[*regexp.Regexp]uint64
 	conn        *websocket.Conn
 	numOffenses map[string]uint64
+	lastMsgs    [300]chatMsg
+	lastMsgIx   int
+	nukedNicks  map[string]time.Time
 
 	Admins []string `toml:"admins"`
 	Chat   struct {
@@ -46,6 +54,7 @@ func loadState() *state {
 	s := &state{
 		blacklist:   map[*regexp.Regexp]uint64{},
 		numOffenses: map[string]uint64{},
+		nukedNicks:  map[string]time.Time{},
 	}
 
 	if info, err := f.Stat(); err == nil && info.Size() == 0 {
@@ -75,10 +84,12 @@ func (s *state) init() {
 	}
 
 	for _, v := range s.Blacklist.Item {
-		err := s.addBlacklist(v.Regexp, v.Duration)
+		re, _, err := compileRegexp(s, []byte(`"`+v.Regexp+`"`))
 		if err != nil {
-			panic("Unable to init blacklist, err: " + err.Error())
+			panic("Unable to compile regexp, err: " + err.Error())
 		}
+
+		s.addBlacklist(re, v.Duration)
 	}
 	for _, v := range s.Offenses {
 		s.numOffenses[v.Nick] = v.Count
@@ -110,13 +121,7 @@ func (s *state) save() {
 	}
 }
 
-func (s *state) addBlacklist(str string, d interface{}) error {
-	re, err := regexp.Compile(str)
-	if err != nil {
-		return err
-	}
-	re.Longest()
-
+func (s *state) addBlacklist(re *regexp.Regexp, d interface{}) {
 	var dur uint64
 	var shouldSave bool
 
@@ -134,6 +139,14 @@ func (s *state) addBlacklist(str string, d interface{}) error {
 	if shouldSave {
 		s.save()
 	}
+}
 
-	return nil
+func (s *state) logChatMsg(nick, msg string) {
+	// only log the last N msgs, use the array as a circular buffer
+	if s.lastMsgIx == cap(s.lastMsgs)-1 {
+		s.lastMsgIx = -1 // start over from the beginning
+	}
+
+	s.lastMsgIx++
+	s.lastMsgs[s.lastMsgIx] = chatMsg{nick: nick, msg: msg}
 }

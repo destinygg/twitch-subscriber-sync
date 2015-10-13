@@ -54,6 +54,16 @@ func sendMute(conn *websocket.Conn, target string, dur uint64) error {
 	return send(conn, "MUTE", m)
 }
 
+func sendUnmute(conn *websocket.Conn, target string) error {
+	m := &struct {
+		Data string `json:"data"`
+	}{
+		Data: target,
+	}
+
+	return send(conn, "UNMUTE", m)
+}
+
 func sendBan(conn *websocket.Conn, target, reason string, dur uint64, ipban bool) error {
 	m := &struct {
 		Nick     string `json:"nick"`
