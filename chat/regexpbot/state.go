@@ -24,13 +24,21 @@ type chatMsg struct {
 }
 
 type state struct {
-	headers     http.Header
-	blacklist   map[*regexp.Regexp]uint64
-	conn        *websocket.Conn
+	headers   http.Header
+	blacklist map[*regexp.Regexp]uint64
+	conn      *websocket.Conn
+
+	// a map of nicks and the number of offenses they did
 	numOffenses map[string]uint64
-	lastMsgs    [300]chatMsg
-	lastMsgIx   int
-	nukedNicks  map[string]time.Time
+
+	// a circular buffer of chat messages to check nukes against
+	lastMsgs  [300]chatMsg
+	lastMsgIx int
+
+	// the current nuke state
+	currentNuke    *regexp.Regexp
+	currentNukeDur uint64
+	nukedNicks     map[string]time.Time
 
 	Admins []string `toml:"admins"`
 	Chat   struct {
@@ -55,6 +63,7 @@ func loadState() *state {
 		blacklist:   map[*regexp.Regexp]uint64{},
 		numOffenses: map[string]uint64{},
 		nukedNicks:  map[string]time.Time{},
+		lastMsgIx:   -1, // because logChatMsg increments it first
 	}
 
 	if info, err := f.Stat(); err == nil && info.Size() == 0 {

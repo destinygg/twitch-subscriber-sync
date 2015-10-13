@@ -29,12 +29,22 @@ again:
 		time.Sleep(5 * time.Second)
 		goto again
 	}
+
+	var lastSeenNuke time.Time
 	c.SetPingHandler(func(m string) error {
 		now := time.Now()
+		if s.currentNuke != nil {
+			if lastSeenNuke.IsZero() {
+				lastSeenNuke = now
+			} else if now.After(lastSeenNuke.Add(10 * time.Minute)) {
+				s.currentNuke = nil
+				lastSeenNuke = time.Time{}
+			}
+		}
 
 		// clean up the nuked nicks here
 		for n, t := range s.nukedNicks {
-			if now.Before(t.Add(1 * time.Hour)) {
+			if now.After(t.Add(1 * time.Hour)) {
 				delete(s.nukedNicks, n)
 			}
 		}
@@ -100,7 +110,17 @@ func handleMessage(s *state, msg *inMessage) error {
 		}
 	}
 
-	s.logChatMsg(msg.Nick, msg.Data)
+	if s.currentNuke != nil && s.currentNuke.MatchString(msg.Data) {
+		err := sendMute(s.conn, msg.Nick, s.currentNukeDur)
+		if err != nil {
+			return err
+		}
+
+		s.nukedNicks[msg.Nick] = time.Now()
+	} else {
+		s.logChatMsg(msg.Nick, msg.Data)
+	}
+
 	for re, dur := range s.blacklist {
 		if re.MatchString(msg.Data) {
 			// make the offenses scale
@@ -241,9 +261,10 @@ var adminCommands = map[string]func(*state, []byte) error{
 		}
 
 		d := dur.(uint64)
+		s.currentNukeDur = d
 		now := time.Now()
 		for _, v := range s.lastMsgs {
-			if !re.MatchString(v.msg) {
+			if len(v.nick) == 0 || !re.MatchString(v.msg) {
 				continue
 			}
 
@@ -254,9 +275,11 @@ var adminCommands = map[string]func(*state, []byte) error{
 
 			s.nukedNicks[v.nick] = now
 		}
+		s.currentNuke = re
 		return nil
 	},
 	"regexpaegis": func(s *state, arg []byte) error {
+		s.currentNuke = nil
 		for nick := range s.nukedNicks {
 			err := sendUnmute(s.conn, nick)
 			if err != nil {
