@@ -84,12 +84,6 @@ func handleWebsocket(s *state) {
 }
 
 func handleMessage(s *state, msg *inMessage) error {
-	for _, v := range s.Admins {
-		if v == msg.Nick {
-			return nil
-		}
-	}
-
 	for _, v := range msg.Features {
 		if v == "admin" || v == "protected" {
 			return nil
