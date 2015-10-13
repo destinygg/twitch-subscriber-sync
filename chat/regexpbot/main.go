@@ -36,10 +36,10 @@ again:
 		c.SetReadDeadline(time.Now().Add(120 * time.Second))
 		return nil
 	})
-	defer c.Close()
 
 	s.conn = c
 	handleWebsocket(s)
+	_ = c.Close()
 	time.Sleep(5 * time.Second)
 	goto again
 }
