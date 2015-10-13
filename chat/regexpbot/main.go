@@ -112,7 +112,7 @@ func handleMessage(s *state, msg *inMessage) error {
 func handleAdminMessage(s *state, msg []byte) error {
 	var command string
 	var arg []byte
-	if len(msg) == 0 || string(msg[:1]) != "!" {
+	if len(msg) == 0 || msg[0] != '!' {
 		return nil
 	}
 
