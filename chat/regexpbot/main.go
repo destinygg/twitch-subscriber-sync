@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -95,7 +96,7 @@ func handleMessage(s *state, msg *inMessage) error {
 			// make the offenses scale
 			s.numOffenses[msg.Nick]++
 			n := s.numOffenses[msg.Nick]
-			dur *= uint64(n)
+			dur *= uint64(math.Pow(2, float64(n-1)))
 
 			err := sendMute(s.conn, msg.Nick, dur)
 			if err != nil {
