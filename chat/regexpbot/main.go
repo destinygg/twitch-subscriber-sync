@@ -260,11 +260,14 @@ var adminCommands = map[string]func(*state, []byte) error{
 			return sendMessage(s.conn, "Unable to parse regexp, err: "+err.Error())
 		}
 
-		d := dur.(uint64)
+		d := parseDuration(dur.(string), "m")
 		s.currentNukeDur = d
 		now := time.Now()
 		for _, v := range s.lastMsgs {
 			if len(v.nick) == 0 || !re.MatchString(v.msg) {
+				continue
+			}
+			if _, ok := s.nukedNicks[v.nick]; ok {
 				continue
 			}
 
