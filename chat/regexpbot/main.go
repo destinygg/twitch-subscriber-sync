@@ -166,18 +166,18 @@ func handleAdminMessage(s *state, msg []byte) error {
 	return nil
 }
 
-var adminRE = regexp.MustCompile("(?i)^.*[\"`](.+)[\"`].*?([\\da-z]+)?")
+var adminRE = regexp.MustCompile("(?i)^.*['\"`](.+)['\"`].*?([\\da-z]+)?")
 
 func compileRegexp(s *state, line []byte) (*regexp.Regexp, interface{}, error) {
 	m := adminRE.FindSubmatch(line)
 	if len(m) == 0 {
-		return nil, 0, nil
+		return nil, 0, fmt.Errorf("Invalid command syntax, ex: !<command> `regex` [duration]")
 	}
 
 	rs := string(m[1])
 	re, err := regexp.Compile(rs)
 	if err != nil {
-		return nil, 0, nil
+		return nil, 0, err
 	}
 
 	var dur string
@@ -260,8 +260,7 @@ var adminCommands = map[string]func(*state, []byte) error{
 			return sendMessage(s.conn, "Unable to parse regexp, err: "+err.Error())
 		}
 
-		d := parseDuration(dur.(string), "m")
-		s.currentNukeDur = d
+		s.currentNukeDur = parseDuration(dur.(string), "m")
 		now := time.Now()
 		for _, v := range s.lastMsgs {
 			if len(v.nick) == 0 || !re.MatchString(v.msg) {
@@ -271,7 +270,7 @@ var adminCommands = map[string]func(*state, []byte) error{
 				continue
 			}
 
-			err := sendMute(s.conn, v.nick, d)
+			err := sendMute(s.conn, v.nick, s.currentNukeDur)
 			if err != nil {
 				return err
 			}
