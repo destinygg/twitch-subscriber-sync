@@ -49,7 +49,7 @@ func main() {
 	ctx = api.Init(ctx)
 
 	lastsent := time.Now()
-	a := api.GetFromContext(ctx)
+	a := api.FromContext(ctx)
 	unbanchan := make(chan string)
 	go initBans(ctx, unbanchan)
 

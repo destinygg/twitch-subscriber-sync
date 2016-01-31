@@ -8,7 +8,7 @@ import (
 )
 
 func Init(ctx context.Context) context.Context {
-	cfg := config.GetFromContext(ctx)
+	cfg := config.FromContext(ctx)
 	db := sqlx.MustConnect("mysql", cfg.Database.DSN)
 
 	db.SetMaxIdleConns(cfg.Database.MaxIdleConnections)
@@ -17,7 +17,7 @@ func Init(ctx context.Context) context.Context {
 	return context.WithValue(ctx, "db", db)
 }
 
-func GetFromContext(ctx context.Context) *sqlx.DB {
+func FromContext(ctx context.Context) *sqlx.DB {
 	db, ok := ctx.Value("db").(*sqlx.DB)
 	if !ok {
 		panic("SQL database not found in the context")

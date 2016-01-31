@@ -29,7 +29,7 @@ import (
 )
 
 func InitDB(ctx context.Context) context.Context {
-	cfg := config.GetFromContext(ctx)
+	cfg := config.FromContext(ctx)
 	db, err := sql.Open("mysql", cfg.Database.DSN)
 	if err != nil {
 		d.F("Could not open database: %#v", err)

@@ -49,7 +49,7 @@ type Api struct {
 
 func Init(ctx context.Context) context.Context {
 	api := &Api{
-		cfg:        config.GetFromContext(ctx),
+		cfg:        config.FromContext(ctx),
 		subs:       map[string]int{},
 		nicksToIDs: map[string]string{},
 		client: http.Client{
@@ -61,17 +61,17 @@ func Init(ctx context.Context) context.Context {
 		},
 	}
 
-	go api.run(twitch.GetFromContext(ctx))
+	go api.run(twitch.FromContext(ctx))
 	return context.WithValue(ctx, "dggapi", api)
 }
 
-func GetFromContext(ctx context.Context) *Api {
+func FromContext(ctx context.Context) *Api {
 	api, _ := ctx.Value("dggapi").(*Api)
 	return api
 }
 
 func (a *Api) call(method, url string, body io.Reader) (data []byte, err error) {
-	u := url + "?privatekey=" + a.cfg.Website.PrivateAPIKey[0]
+	u := url + "?privatekey=" + a.cfg.Website.PrivateAPIKey
 	req, err := http.NewRequest(method, u, body)
 	if err != nil {
 		d.PF(2, "Could not create request: %#v", err)

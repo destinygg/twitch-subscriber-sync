@@ -54,14 +54,14 @@ var client = &http.Client{
 
 func Init(ctx context.Context) context.Context {
 	tw := &Twitch{
-		cfg:     &config.GetFromContext(ctx).TwitchScrape,
+		cfg:     &config.FromContext(ctx).TwitchScrape,
 		apibase: "https://api.twitch.tv/kraken/",
 	}
 
 	return context.WithValue(ctx, "twitch", tw)
 }
 
-func GetFromContext(ctx context.Context) *Twitch {
+func FromContext(ctx context.Context) *Twitch {
 	cfg, _ := ctx.Value("twitch").(*Twitch)
 	return cfg
 }
@@ -148,7 +148,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			}
 		}
 
-		if err != nil || res.StatusCode != 200 {
+		if err != nil || res == nil || res.StatusCode != 200 {
 			if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")
 			}

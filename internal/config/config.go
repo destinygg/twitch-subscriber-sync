@@ -31,133 +31,133 @@ import (
 )
 
 type Website struct {
-	Addr          string
-	BaseHost      string
-	CDNHost       string
-	PrivateAPIKey string
+	Addr          string `toml:"addr"`
+	BaseHost      string `toml:"basehost"`
+	CDNHost       string `toml:"cdnhost"`
+	PrivateAPIKey string `toml:"privateapikey"`
 }
 
 type Debug struct {
-	Debug   bool
-	Logfile string
+	Debug   bool   `toml:"debug"`
+	Logfile string `toml:"logfile"`
 }
 
 type Database struct {
-	DSN                string
-	MaxIdleConnections int
-	MaxConnections     int
+	DSN                string `toml:"dsn"`
+	MaxIdleConnections int    `toml:"maxidleconnections"`
+	MaxConnections     int    `toml:"maxconnections"`
 }
 
 type Redis struct {
-	Addr     string
-	Password string
-	DBIndex  int
-	PoolSize int
+	Addr     string `toml:"addr"`
+	Password string `toml:"password"`
+	DBIndex  int    `toml:"dbindex"`
+	PoolSize int    `toml:"poolsize"`
 }
 
 type Braintree struct {
-	Environment string
-	MerchantID  string
-	PublicKey   string
-	PrivateKey  string
+	Environment string `toml:"environment"`
+	MerchantID  string `toml:"merchantid"`
+	PublicKey   string `toml:"publickey"`
+	PrivateKey  string `toml:"privatekey"`
 }
 
 type SMTP struct {
-	Addr      string
-	Username  string
-	Password  string
-	FromEmail string
-	LogEmail  []string
+	Addr      string   `toml:"addr"`
+	Username  string   `toml:"username"`
+	Password  string   `toml:"password"`
+	FromEmail string   `toml:"fromemail"`
+	LogEmail  []string `toml:"logemail"`
 }
 
 type Metrics struct {
-	URL      string
-	Username string
-	Password string
+	URL      string `toml:"url"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
 }
 
 type TwitchScrape struct {
-	OAuthToken  string
-	GetSubURL   string
-	AddSubURL   string
-	ModSubURL   string
-	ReSubURL    string
-	PollMinutes int64
-	Addr        string
-	Nick        string
-	Password    string
-	Channel     string
+	OAuthToken  string `toml:"oauthtoken"`
+	GetSubURL   string `toml:"getsuburl"`
+	AddSubURL   string `toml:"addsuburl"`
+	ModSubURL   string `toml:"modsuburl"`
+	ReSubURL    string `toml:"resuburl"`
+	PollMinutes int64  `toml:"pollminutes"`
+	Addr        string `toml:"addr"`
+	Nick        string `toml:"nick"`
+	Password    string `toml:"password"`
+	Channel     string `toml:"channel"`
 }
 
 type AppConfig struct {
-	Website
-	Debug
-	Database
-	Redis
-	Braintree
-	SMTP
-	Metrics
-	TwitchScrape
+	Website      `toml:"website"`
+	Debug        `toml:"debug"`
+	Database     `toml:"database"`
+	Redis        `toml:"redis"`
+	Braintree    `toml:"braintree"`
+	SMTP         `toml:"smtp"`
+	Metrics      `toml:"metrics"`
+	TwitchScrape `toml:"twitchscrape"`
 }
 
 var settingsFile *string
 
 const sampleconf = `[website]
-addr=:80
-basehost=www.destiny.gg
-cdnhost=cdn.destiny.gg
-privateapikey=keepitsecret
+addr=":80"
+basehost="www.destiny.gg"
+cdnhost="cdn.destiny.gg"
+privateapikey="keepitsecret"
 
 [debug]
-debug=no
-logfile=logs/debug.txt
+debug=false
+logfile="logs/debug.txt"
 
 [database]
-dsn=user:password@tcp(localhost:3306)/destinygg?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone='+00:00'
+dsn="user:password@tcp(localhost:3306)/destinygg?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone='+00:00'"
 maxidleconnections=128
 maxconnections=256
 
 [redis]
-addr=localhost:6379
+addr="localhost:6379"
 dbindex=0
-password=
+password=""
 poolsize=128
 
 [braintree]
-environment=production
-merchantid=
-publickey=
-privatekey=
+environment="production"
+merchantid=""
+publickey=""
+privatekey=""
 
 [smtp]
-addr=
-username=
-password=
-fromemail=
+addr=""
+username=""
+password=""
+fromemail=""
 # where to send error emails to, if there are multiple, every one  of them will
 # receive the emails, use array notation aka
 # logemail=["firstemail@domain.tld", "secondemail@domain.tld"]
-logemail=
+logemail=[]
 
 [metrics]
-url=http://localhost:8083
-username=
-password=
+url="http://localhost:8083"
+username=""
+password=""
 
 [twitchscrape]
 # oauthtoken is used to request the subs from the twitch api and for the
 # password to the twitch irc server,
 # requires scopes: channel_subscriptions channel_check_subscription chat_login
-oauthtoken=generateone
-getsuburl=http://127.0.0.1/api/twitchsubscriptions
-addsuburl=http://127.0.0.1/api/addtwitchsubscription
-modsuburl=http://127.0.0.1/api/twitchsubscriptions
-resuburl=http://127.0.0.1/api/twitchresubscription
+oauthtoken="generateone"
+getsuburl="http://127.0.0.1/api/twitchsubscriptions"
+addsuburl="http://127.0.0.1/api/addtwitchsubscription"
+modsuburl="http://127.0.0.1/api/twitchsubscriptions"
+resuburl="http://127.0.0.1/api/twitchresubscription"
 # how many minutes between syncing the subs over
 pollminutes=60
-addr=irc.twitch.tv:6667
-nick=mytwitchuser
-channel=destiny
+addr="irc.twitch.tv:6667"
+nick="mytwitchuser"
+channel="destiny"
 `
 
 func Init(ctx context.Context) context.Context {
@@ -196,7 +196,7 @@ func WriteConfig(w io.Writer, d interface{}) error {
 }
 
 func Save(ctx context.Context) error {
-	return SafeSave(*settingsFile, GetFromContext(ctx))
+	return SafeSave(*settingsFile, *FromContext(ctx))
 }
 
 func SafeSave(file string, data interface{}) error {
@@ -219,7 +219,7 @@ func SafeSave(file string, data interface{}) error {
 	return os.Rename(f.Name(), file)
 }
 
-func GetFromContext(ctx context.Context) *AppConfig {
+func FromContext(ctx context.Context) *AppConfig {
 	cfg, _ := ctx.Value("appconfig").(*AppConfig)
 	return cfg
 }

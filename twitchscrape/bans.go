@@ -11,8 +11,8 @@ import (
 )
 
 func initBans(ctx context.Context, unbanchan chan string) {
-	db := db.GetFromContext(ctx)
-	rdb := rds.GetFromContext(ctx)
+	db := db.FromContext(ctx)
+	rdb := rds.FromContext(ctx)
 	rds.SetupSubscribe(rdb, "unbanuserid", func(result *redis.PublishedValue) {
 		userid, err := result.Value.Uint64()
 		if err != nil {

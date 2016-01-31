@@ -138,7 +138,7 @@ func (c *IConn) Read() *irc.Message {
 
 func Init(ctx context.Context, cb func(*IConn, *irc.Message)) {
 	// TODO implement metrics for emote usage, lines per sec, etc
-	cfg := &config.GetFromContext(ctx).TwitchScrape
+	cfg := &config.FromContext(ctx).TwitchScrape
 	c := &IConn{cfg: cfg}
 	c.Reconnect()
 
