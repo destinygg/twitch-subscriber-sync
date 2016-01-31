@@ -79,7 +79,7 @@ func (a *Api) call(method, url string, body io.Reader) (data []byte, err error) 
 	}
 
 	res, err := a.client.Do(req)
-	if res.Body == nil {
+	if res == nil || res.Body == nil {
 		return nil, nil
 	}
 	defer res.Body.Close()
