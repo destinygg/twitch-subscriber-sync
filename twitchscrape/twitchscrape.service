@@ -1,0 +1,13 @@
+[Unit]
+Description=twitchscrape listens in IRC/API for twitch subscriptions and translates them to dgg subs
+After=network.target
+
+[Service]
+User=sztanpet
+Group=sztanpet
+WorkingDirectory=/home/sztanpet/scrapebot
+ExecStart=/home/sztanpet/scrapebot/twitchscrape
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
