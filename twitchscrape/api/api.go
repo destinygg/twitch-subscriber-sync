@@ -70,7 +70,7 @@ func FromContext(ctx context.Context) *Api {
 	return api
 }
 
-func (a *Api) call(method, url string, body io.Reader) (data []byte, err error) {
+func (a *Api) call(method, url string, body io.Reader) ([]byte, error) {
 	u := url + "?privatekey=" + a.cfg.Website.PrivateAPIKey
 	req, err := http.NewRequest(method, u, body)
 	if err != nil {
@@ -85,135 +85,177 @@ func (a *Api) call(method, url string, body io.Reader) (data []byte, err error) 
 	defer res.Body.Close()
 
 	if err != nil || res.StatusCode < 200 || res.StatusCode >= 300 {
-		data, _ = ioutil.ReadAll(res.Body)
+		data, _ := ioutil.ReadAll(res.Body)
 		d.PF(2, "Request failed: %#v, body was \n%v", err, string(data))
 		return nil, err
 	}
 
-	data, err = ioutil.ReadAll(res.Body)
+	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		d.PF(2, "Could not read body: %#v", err)
 		return nil, err
 	}
 
-	return
+	return data, nil
 }
 
-func (a *Api) getSubs() {
+func (a *Api) getSubsLocked() error {
 	userids := struct {
 		Authids []string
 	}{}
 
 	data, err := a.call("GET", a.cfg.TwitchScrape.GetSubURL, nil)
 	if err != nil {
-		time.Sleep(time.Second)
-		a.getSubs()
+		return err
 	}
 
 	err = json.Unmarshal(data, &userids)
 	if err != nil {
-		d.P("Could not unmarshal subs:", err, string(data))
-		return
+		return err
 	}
 
 	for _, id := range userids.Authids {
 		a.subs[id] = 1
 	}
-	return
+	return nil
 }
 
-func (a *Api) fromNick(nick string) string {
-	if id, ok := a.nicksToIDs[strings.ToLower(nick)]; ok {
-		return id
-	} else {
-		d.DF(2, "Could not find the ID of the twitch user %v", nick)
-		return ""
-	}
+func (a *Api) addNickLocked(nick, id string) {
+	a.nicksToIDs[strings.ToLower(nick)] = id
+}
+
+func (a *Api) nickToIDLocked(nick string) (string, bool) {
+	id, ok := a.nicksToIDs[strings.ToLower(nick)]
+	return id, ok
 }
 
 // ReSub is safe to call concurrently
-func (a *Api) ReSub(nick string) {
+func (a *Api) ReSub(nick string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if id := a.fromNick(nick); id != "" {
+	var err error
+	if id, ok := a.nickToIDLocked(nick); ok {
 		d.DF(1, "Resubbing: %v (%v)", nick, id)
 		a.subs[id] = 1
 
 		d := map[string]int{id: 1}
-		a.syncSubs(d, a.cfg.TwitchScrape.ReSubURL)
+		err = a.syncSubs(d, a.cfg.TwitchScrape.ReSubURL)
 	} else {
 		d.DF(1, "Failed to resub: %v (not found on d.gg)", nick)
 	}
+
+	return err
 }
 
 // AddSub is safe to call concurrently
-func (a *Api) AddSub(nick string) {
+func (a *Api) AddSub(nick string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	d.DF(1, "Adding sub: %v", nick)
 
 	data := struct {
 		Nick string `json:"nick"`
 	}{Nick: nick}
-	buf := bytes.Buffer{}
-	enc := json.NewEncoder(&buf)
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
 	_ = enc.Encode(data)
-	a.call("POST", a.cfg.TwitchScrape.AddSubURL, &buf)
+
+	res, err := a.call("POST", a.cfg.TwitchScrape.AddSubURL, buf)
+	if err != nil {
+		return err
+	}
+
+	resID := &struct {
+		ID string `json:"id"`
+	}{}
+	err = json.Unmarshal(res, resID)
+	if err != nil {
+		return err
+	}
+
+	if resID.ID != "" {
+		a.addNickLocked(nick, resID.ID)
+		a.subs[resID.ID] = 1
+	}
+
+	return err
 }
 
-func (a Api) syncSubs(subs map[string]int, url string) {
-	buf := bytes.Buffer{}
-	enc := json.NewEncoder(&buf)
+// separate url parameter so that we can differentiate between resubs and
+// fresh subs
+func (a Api) syncSubs(subs map[string]int, url string) error {
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
 	_ = enc.Encode(subs)
-	a.call("POST", url, &buf)
+
+	_, err := a.call("POST", url, buf)
+	return err
 }
 
 func (a *Api) run(tw *twitch.Twitch) {
 	t := time.NewTicker(time.Duration(a.cfg.PollMinutes) * time.Minute)
 
 	for {
-		a.mu.Lock()
-		a.getSubs()
-		users, err := tw.GetSubs()
-		// can only decide the list of unsubs if GetSubs returns no error and
-		// as such, returns every single sub
-		if err == nil {
-			diff := make(map[string]int)
-			visited := make(map[string]struct{}, len(users))
-
-			for _, u := range users {
-				a.nicksToIDs[strings.ToLower(u.Name)] = u.ID
-				visited[u.ID] = struct{}{}
-
-				wassub, ok := a.subs[u.ID]
-				if wassub != 1 && ok { // was not a sub before, but is now
-					a.subs[u.ID] = 1
-					diff[u.ID] = 1
-				} else if !ok { // was not found at all, but could have registered since
-					diff[u.ID] = 1
-				}
-			}
-
-			// now check for expired subs, expired var is purely for logging reasons
-			var expired int
-			for id, wassub := range a.subs {
-				if _, ok := visited[id]; ok { // already seen, has to be a sub
-					continue
-				}
-
-				if wassub == 1 { // was a sub, but is no longer
-					a.subs[id] = 0
-					diff[id] = 0
-					expired++
-				}
-			}
-
-			// report the difference from the known d.gg subs always
-			d.DF(1, "Found %v subs, syncing: %v, number of expired/notfound subs: %v", len(users), len(diff), expired)
-			a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
+		err := a.syncFromTwitch(tw)
+		// retry on error
+		if err != nil {
+			d.P("syncFromTwitch failed, retrying: ", err)
+			time.Sleep(30 * time.Second)
+			continue
 		}
-		a.mu.Unlock()
+
 		_ = <-t.C
 	}
+}
+
+func (a *Api) syncFromTwitch(tw *twitch.Twitch) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	err := a.getSubsLocked()
+	if err != nil {
+		d.P("Could not get subs: ", err)
+		return err
+	}
+
+	users, err := tw.GetSubs()
+	if err != nil {
+		return err
+	}
+
+	diff := make(map[string]int)
+	visited := make(map[string]struct{}, len(users))
+
+	for _, u := range users {
+		a.addNickLocked(u.Name, u.ID)
+		visited[u.ID] = struct{}{}
+
+		wassub, ok := a.subs[u.ID]
+		if wassub != 1 && ok { // was not a sub before, but is now
+			a.subs[u.ID] = 1
+			diff[u.ID] = 1
+		} else if !ok { // was not found at all, but could have registered since
+			diff[u.ID] = 1
+		}
+	}
+
+	// now check for expired subs, expired var is purely for logging reasons
+	var expired int
+	for id, wassub := range a.subs {
+		if _, ok := visited[id]; ok { // already seen, has to be a sub
+			continue
+		}
+
+		if wassub == 1 { // was a sub, but is no longer
+			a.subs[id] = 0
+			diff[id] = 0
+			expired++
+		}
+	}
+
+	// report the difference from the known d.gg subs always
+	d.DF(1, "Found %v subs, syncing: %v, number of expired/notfound subs: %v", len(users), len(diff), expired)
+	err = a.syncSubs(diff, a.cfg.TwitchScrape.ModSubURL)
+
+	return err
 }

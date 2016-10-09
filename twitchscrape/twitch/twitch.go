@@ -148,7 +148,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			}
 		}
 
-		if err != nil || res == nil || res.StatusCode != 200 {
+		if err != nil || res == nil || (res != nil && res.StatusCode != 200) {
 			if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")
 			}

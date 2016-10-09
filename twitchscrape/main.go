@@ -78,17 +78,22 @@ func main() {
 		switch m.Command {
 		case irc.PRIVMSG:
 			if nick, resub := getNewSubNick(m); nick != "" {
+				var err error
 				if resub {
-					a.ReSub(nick)
+					err = a.ReSub(nick)
 				} else {
-					a.AddSub(nick)
+					err = a.AddSub(nick)
+				}
+
+				if err != nil {
+					d.P("Could not sub nick %v (resub: %v)", nick, resub)
 				}
 			}
 		}
 	})
 }
 
-var subRe = regexp.MustCompile(`^([^ ]+) (?:just subscribed|subscribed for (\d+) months in a row)!$`)
+var subRe = regexp.MustCompile(`^([^ ]+) (?:just subscribed.*|subscribed for (\d+) months in a row)!$`)
 
 func getNewSubNick(m *irc.Message) (nick string, resub bool) {
 	if m.Prefix.Name != "twitchnotify" {
