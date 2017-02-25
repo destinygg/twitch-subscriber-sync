@@ -78,6 +78,7 @@ type Metrics struct {
 
 type TwitchScrape struct {
 	OAuthToken  string `toml:"oauthtoken"`
+	ClientID    string `toml:"clientid"`
 	GetSubURL   string `toml:"getsuburl"`
 	AddSubURL   string `toml:"addsuburl"`
 	ModSubURL   string `toml:"modsuburl"`
@@ -149,6 +150,7 @@ password=""
 # password to the twitch irc server,
 # requires scopes: channel_subscriptions channel_check_subscription chat_login
 oauthtoken="generateone"
+clientid="generateone"
 getsuburl="http://127.0.0.1/api/twitchsubscriptions"
 addsuburl="http://127.0.0.1/api/addtwitchsubscription"
 modsuburl="http://127.0.0.1/api/twitchsubscriptions"
