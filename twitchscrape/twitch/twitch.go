@@ -118,6 +118,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	headers := http.Header{
 		"Accept":        []string{"application/vnd.twitchtv.v3+json"},
 		"Authorization": []string{"OAuth " + t.cfg.OAuthToken},
+		"Client-ID":     []string{t.cfg.ClientID},
 	}
 
 	for {
