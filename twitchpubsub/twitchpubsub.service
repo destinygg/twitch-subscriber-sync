@@ -1,0 +1,13 @@
+[Unit]
+Description=twitchpubsub listens in WebSocket/API for twitch subscriptions and translates them to dgg subs
+After=network.target
+
+[Service]
+User=sztanpet
+Group=sztanpet
+WorkingDirectory=/home/sztanpet/twitchpubsub
+ExecStart=/home/sztanpet/twitchpubsub/twitchpubsub
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

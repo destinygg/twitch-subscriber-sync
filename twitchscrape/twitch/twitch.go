@@ -130,6 +130,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 				d.P("could not parse url", urlStr)
 				return nil, err
 			}
+			d.DF(1,"Calling %s", u)
 			res, err = client.Do(&http.Request{
 				Method:     "GET",
 				URL:        u,
@@ -144,7 +145,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-				d.P("temporary http error, retrying", urlStr)
+				d.DF(1, "temporary http error, retrying", urlStr)
 				continue
 			}
 		}
@@ -168,6 +169,8 @@ func (t *Twitch) GetSubs() ([]User, error) {
 		if users == nil {
 			users = make([]User, 0, js.Total)
 		}
+
+		d.DF(1, "Successful response. Returned records [%v] Total users [%v]", len(js.Subs), len(users))
 
 		if len(js.Subs) == 0 {
 			return users, nil
