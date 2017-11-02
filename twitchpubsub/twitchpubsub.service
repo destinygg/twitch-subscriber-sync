@@ -3,10 +3,10 @@ Description=twitchpubsub listens in WebSocket/API for twitch subscriptions and t
 After=network.target
 
 [Service]
-User=sztanpet
-Group=sztanpet
-WorkingDirectory=/home/sztanpet/twitchpubsub
-ExecStart=/home/sztanpet/twitchpubsub/twitchpubsub
+User=destiny
+Group=www-data
+WorkingDirectory=/home/destiny/twitchpubsub
+ExecStart=/home/destiny/twitchpubsub/twitchpubsub
 Restart=on-failure
 
 [Install]
