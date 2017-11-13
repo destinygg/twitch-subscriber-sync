@@ -139,8 +139,8 @@ func (a *Api) ReSub(nick string) error {
 		d.DF(1, "Resubbing: %v (%v)", nick, id)
 		a.subs[id] = 1
 
-		d := map[string]int{id: 1}
-		err = a.syncSubs(d, a.cfg.TwitchScrape.ReSubURL)
+		s := map[string]int{id: 1}
+		err = a.syncSubs(s, a.cfg.TwitchScrape.ReSubURL)
 	} else {
 		d.DF(1, "Failed to resub: %v (not found on d.gg)", nick)
 	}

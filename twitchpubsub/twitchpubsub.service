@@ -1,0 +1,13 @@
+[Unit]
+Description=twitchpubsub listens in WebSocket/API for twitch subscriptions and translates them to dgg subs
+After=network.target
+
+[Service]
+User=destiny
+Group=www-data
+WorkingDirectory=/home/destiny/twitchpubsub
+ExecStart=/home/destiny/twitchpubsub/twitchpubsub
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

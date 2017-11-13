@@ -5,3 +5,4 @@ precommit
 *.pprof
 .state.dc
 .settings.cfg
+*.idea

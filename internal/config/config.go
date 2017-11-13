@@ -55,21 +55,6 @@ type Redis struct {
 	PoolSize int    `toml:"poolsize"`
 }
 
-type Braintree struct {
-	Environment string `toml:"environment"`
-	MerchantID  string `toml:"merchantid"`
-	PublicKey   string `toml:"publickey"`
-	PrivateKey  string `toml:"privatekey"`
-}
-
-type SMTP struct {
-	Addr      string   `toml:"addr"`
-	Username  string   `toml:"username"`
-	Password  string   `toml:"password"`
-	FromEmail string   `toml:"fromemail"`
-	LogEmail  []string `toml:"logemail"`
-}
-
 type Metrics struct {
 	URL      string `toml:"url"`
 	Username string `toml:"username"`
@@ -83,11 +68,13 @@ type TwitchScrape struct {
 	AddSubURL   string `toml:"addsuburl"`
 	ModSubURL   string `toml:"modsuburl"`
 	ReSubURL    string `toml:"resuburl"`
+	SubURL      string `toml:"suburl"`
 	PollMinutes int64  `toml:"pollminutes"`
 	Addr        string `toml:"addr"`
 	Nick        string `toml:"nick"`
 	Password    string `toml:"password"`
 	Channel     string `toml:"channel"`
+	ChannelID 	string `toml:"channelid"`
 }
 
 type AppConfig struct {
@@ -95,8 +82,6 @@ type AppConfig struct {
 	Debug        `toml:"debug"`
 	Database     `toml:"database"`
 	Redis        `toml:"redis"`
-	Braintree    `toml:"braintree"`
-	SMTP         `toml:"smtp"`
 	Metrics      `toml:"metrics"`
 	TwitchScrape `toml:"twitchscrape"`
 }
@@ -124,22 +109,6 @@ dbindex=0
 password=""
 poolsize=128
 
-[braintree]
-environment="production"
-merchantid=""
-publickey=""
-privatekey=""
-
-[smtp]
-addr=""
-username=""
-password=""
-fromemail=""
-# where to send error emails to, if there are multiple, every one  of them will
-# receive the emails, use array notation aka
-# logemail=["firstemail@domain.tld", "secondemail@domain.tld"]
-logemail=[]
-
 [metrics]
 url="http://localhost:8083"
 username=""
@@ -155,11 +124,13 @@ getsuburl="http://127.0.0.1/api/twitchsubscriptions"
 addsuburl="http://127.0.0.1/api/addtwitchsubscription"
 modsuburl="http://127.0.0.1/api/twitchsubscriptions"
 resuburl="http://127.0.0.1/api/twitchresubscription"
+suburl="http://127.0.0.1/api/twitch/subscribe"
 # how many minutes between syncing the subs over
 pollminutes=60
 addr="irc.twitch.tv:6667"
 nick="mytwitchuser"
 channel="destiny"
+channelid="18074328"
 `
 
 func Init(ctx context.Context) context.Context {
