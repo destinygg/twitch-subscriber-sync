@@ -22,10 +22,7 @@ package config
 import (
 	"flag"
 	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
-
 	"github.com/naoina/toml"
 	"golang.org/x/net/context"
 )
@@ -70,8 +67,6 @@ type TwitchScrape struct {
 	ReSubURL    string `toml:"resuburl"`
 	SubURL      string `toml:"suburl"`
 	PollMinutes int64  `toml:"pollminutes"`
-	Addr        string `toml:"addr"`
-	Nick        string `toml:"nick"`
 	Password    string `toml:"password"`
 	Channel     string `toml:"channel"`
 	ChannelID 	string `toml:"channelid"`
@@ -127,8 +122,6 @@ resuburl="http://127.0.0.1/api/twitchresubscription"
 suburl="http://127.0.0.1/api/twitch/subscribe"
 # how many minutes between syncing the subs over
 pollminutes=60
-addr="irc.twitch.tv:6667"
-nick="mytwitchuser"
 channel="destiny"
 channelid="18074328"
 `
@@ -161,35 +154,6 @@ func Init(ctx context.Context) context.Context {
 func ReadConfig(r io.Reader, d interface{}) error {
 	dec := toml.NewDecoder(r)
 	return dec.Decode(d)
-}
-
-func WriteConfig(w io.Writer, d interface{}) error {
-	enc := toml.NewEncoder(w)
-	return enc.Encode(d)
-}
-
-func Save(ctx context.Context) error {
-	return SafeSave(*settingsFile, *FromContext(ctx))
-}
-
-func SafeSave(file string, data interface{}) error {
-	dir, err := filepath.Abs(filepath.Dir(file))
-	if err != nil {
-		return err
-	}
-
-	f, err := ioutil.TempFile(dir, "tmpconf-")
-	if err != nil {
-		return err
-	}
-
-	err = WriteConfig(f, data)
-	if err != nil {
-		return err
-	}
-	_ = f.Close()
-
-	return os.Rename(f.Name(), file)
 }
 
 func FromContext(ctx context.Context) *AppConfig {

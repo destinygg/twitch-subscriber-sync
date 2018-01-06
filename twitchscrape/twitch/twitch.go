@@ -116,7 +116,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	urlStr := t.apibase + "channels/" + t.cfg.Channel + "/subscriptions?limit=100"
 	// the request headers for reuse
 	headers := http.Header{
-		"Accept":        []string{"application/vnd.twitchtv.v3+json"},
+		"Accept":        []string{"application/vnd.twitchtv.v5+json"},
 		"Authorization": []string{"OAuth " + t.cfg.OAuthToken},
 		"Client-ID":     []string{t.cfg.ClientID},
 	}
