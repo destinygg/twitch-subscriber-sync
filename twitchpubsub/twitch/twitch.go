@@ -14,6 +14,9 @@ import (
 	"github.com/destinygg/website2/internal/debug"
 	"github.com/destinygg/website2/twitchpubsub/api"
 	"golang.org/x/net/context"
+	"net/http"
+	"crypto/tls"
+	"fmt"
 )
 
 const (
@@ -35,6 +38,7 @@ const (
 	// twitch pub/sub
 	webSocketUri    = "wss://pubsub-edge.twitch.tv/"
 	msgEventPrefix  = "channel-subscribe-events-v1"
+	msgErrorBadAuth = "ERR_BADAUTH"
 	msgTypePing     = "PING"
 	msgTypePong     = "PONG"
 	msgTypeListen   = "LISTEN"
@@ -42,28 +46,42 @@ const (
 )
 
 type IConn struct {
-	conn *websocket.Conn
-	cfg *config.TwitchScrape
-	tries float64
+	conn    *websocket.Conn
+	cfg     *config.TwitchScrape
+	tries   float64
 	closing bool
 }
 type Message struct {
-	Type  string `json:"type"`
-	Error string `json:"error,omitempty"`
-	Data MessageData `json:"data,omitempty"`
+	Type  string      `json:"type"`
+	Error string      `json:"error,omitempty"`
+	Data  MessageData `json:"data,omitempty"`
 }
 type MessageData struct {
-	Topic string `json:"topic"`
+	Topic   string `json:"topic"`
 	Message string `json:"message"`
 }
 type SubscribePayload struct {
-	Type string `json:"type"`
-	Nonce string `json:"nonce,omitempty"`
-	Data SubscribePayloadData `json:"data"`
+	Type  string               `json:"type"`
+	Nonce string               `json:"nonce,omitempty"`
+	Data  SubscribePayloadData `json:"data"`
 }
 type SubscribePayloadData struct {
-	Topics []string `json:"topics"`
-	AuthToken string `json:"auth_token,omitempty"`
+	Topics    []string `json:"topics"`
+	AuthToken string   `json:"auth_token,omitempty"`
+}
+
+type TokenStruct struct {
+	AccessToken string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Scope []string `json:"scope"`
+}
+
+var client = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		TLSClientConfig:       &tls.Config{},
+		ResponseHeaderTimeout: 30 * time.Second,
+	},
 }
 
 /*type SubscribeMessageData struct {
@@ -82,9 +100,9 @@ type SubscribePayloadData struct {
 
 func Init(ctx context.Context) context.Context {
 	c := &IConn{
-		cfg: &config.FromContext(ctx).TwitchScrape,
+		cfg:     &config.FromContext(ctx).TwitchScrape,
 		closing: false,
-		tries: 0,
+		tries:   0,
 	}
 	c.run(api.FromContext(ctx))
 	return context.WithValue(ctx, "twitch", c)
@@ -107,7 +125,7 @@ func (c *IConn) run(a *api.Api) {
 		defer c.conn.Close()
 		defer close(done)
 		for {
-			m := c.Read()
+			m, _ := c.Read()
 			if m == nil {
 				continue
 			}
@@ -141,7 +159,7 @@ func (c *IConn) run(a *api.Api) {
 			c.closing = true
 			d.DF(1, "interrupted")
 			if err := c.SendCloseFrame(); err != nil {
-				d.DF(1,"write close: %v", err)
+				d.DF(1, "write close: %v", err)
 				return
 			}
 			select {
@@ -161,7 +179,7 @@ func (c *IConn) ReconnectAfterError(err error) {
 		c.tries = 10.0
 	}
 	dur := time.Duration(math.Pow(2.0, c.tries)*300) * time.Millisecond
-	d.DF(1,"reconnecting in %s", dur)
+	d.DF(1, "reconnecting in %s", dur)
 	time.Sleep(dur)
 	c.tries++
 	c.Reconnect()
@@ -172,7 +190,7 @@ func (c *IConn) Reconnect() {
 		c.conn.Close()
 	}
 	u, err := url.Parse(webSocketUri)
-	d.DF(1,"connecting: %s", u.String())
+	d.DF(1, "connecting: %s", u.String())
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		d.DF(1, "conn error: %+v", err)
@@ -187,7 +205,7 @@ func (c *IConn) Reconnect() {
 	m := &SubscribePayload{
 		Type: msgTypeListen,
 		Data: SubscribePayloadData{
-			AuthToken: c.cfg.OAuthToken,
+			AuthToken: c.cfg.AccessToken,
 			Topics: []string{msgEventPrefix + "." + c.cfg.ChannelID},
 		}}
 
@@ -204,14 +222,14 @@ func (c *IConn) SendCloseFrame() error {
 func (c *IConn) Write(messageType int, data []byte) {
 	c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 	data = bytes.TrimSpace(data)
-	d.DF(1,"-> %s", data)
+	d.DF(1, "-> %s", data)
 	if err := c.conn.WriteMessage(messageType, data); err != nil {
-		d.DF(1,"write error: %+v", err)
+		d.DF(1, "write error: %+v", err)
 		c.ReconnectAfterError(err)
 	}
 }
 
-func (c *IConn) Read() (*Message) {
+func (c *IConn) Read() (*Message, error) {
 	_, message, err := c.conn.ReadMessage()
 	if err != nil {
 		if !c.closing {
@@ -220,17 +238,69 @@ func (c *IConn) Read() (*Message) {
 			d.DF(1, "read error: %+v", err)
 			c.ReconnectAfterError(err)
 		}
-		return nil
+		return nil, err
 	}
 	m := &Message{}
 	if err := json.Unmarshal(message, &m); err != nil {
-		d.DF(1,"parse error: %v", err)
-		return nil
+		d.DF(1, "parse error: %v", err)
+		return nil, err
 	}
 	if m.Type == msgTypePong {
 		c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
+		return nil, nil // return nil so that the message is not "handled"
 	}
-	d.DF(1,"<- %s", m)
-	return m
+	if m.Error == msgErrorBadAuth {
+		d.DF(1, "bad authentication %s", m)
+		err = c.Auth()
+		return nil, err
+	}
+	d.DF(1, "<- %s", m)
+	return m, err
+}
+
+func (c *IConn) Auth() error {
+	d.DF(1, "renewing access token")
+	u, _ := url.Parse("https://api.twitch.tv/kraken/oauth2/token")
+	q := u.Query()
+	q.Add("grant_type", "refresh_token")
+	q.Add("refresh_token", c.cfg.RefreshToken)
+	q.Add("client_id", c.cfg.ClientID)
+	q.Add("client_secret", c.cfg.ClientSecret)
+	u.RawQuery = q.Encode()
+	headers := http.Header{"Accept": []string{"application/vnd.twitchtv.v5+json"}}
+	var res *http.Response
+	{
+		d.DF(1, "Calling %s", u)
+		res, err := client.Do(&http.Request{
+			Method:     "POST",
+			URL:        u,
+			Proto:      "HTTP/1.1",
+			ProtoMinor: 1,
+			Header:     headers,
+			Body:       nil,
+			Host:       u.Host,
+		})
+		if err != nil || res == nil || res.StatusCode != 200 {
+			if res != nil && res.StatusCode != 200 {
+				err = fmt.Errorf("non-200 statuscode received from twitch %v", res)
+			} else if err == nil {
+				err = fmt.Errorf("non-200 statuscode received from twitch")
+			}
+			d.P("Failed to GET the auth token, url, res, err", u, res, err)
+			return err
+		}
+		tokens := &TokenStruct{}
+		err = json.NewDecoder(res.Body).Decode(tokens)
+		res.Body.Close()
+		if err != nil {
+			d.P("Failed to decode twitch response %v", err)
+			return err
+		}
+		d.DF(1, "Updated OAuth Tokens")
+		c.cfg.RefreshToken = tokens.RefreshToken
+		c.cfg.AccessToken = tokens.AccessToken
+		config.ReadTokensFile(c.cfg, true)
+	}
+	d.DF(1, "Response %v", res)
+	return nil
 }

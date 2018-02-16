@@ -61,7 +61,7 @@ func Init(ctx context.Context) context.Context {
 		},
 	}
 
-	go api.run(twitch.FromContext(ctx))
+	api.run(twitch.FromContext(ctx))
 	return context.WithValue(ctx, "dggapi", api)
 }
 

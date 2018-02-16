@@ -6,3 +6,5 @@ precommit
 .state.dc
 .settings.cfg
 *.idea
+/twitchscrape/twitchtokens
+/twitchpubsub/twitchtokens

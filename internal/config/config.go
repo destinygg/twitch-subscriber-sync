@@ -59,17 +59,19 @@ type Metrics struct {
 }
 
 type TwitchScrape struct {
-	OAuthToken  string `toml:"oauthtoken"`
-	ClientID    string `toml:"clientid"`
-	GetSubURL   string `toml:"getsuburl"`
-	AddSubURL   string `toml:"addsuburl"`
-	ModSubURL   string `toml:"modsuburl"`
-	ReSubURL    string `toml:"resuburl"`
-	SubURL      string `toml:"suburl"`
-	PollMinutes int64  `toml:"pollminutes"`
-	Password    string `toml:"password"`
-	Channel     string `toml:"channel"`
-	ChannelID 	string `toml:"channelid"`
+	ClientID     string `toml:"clientid"`
+	ClientSecret string `toml:"clientsecret"`
+	AccessToken  string `toml:"accesstoken"`
+	RefreshToken string `toml:"refreshtoken"`
+	GetSubURL    string `toml:"getsuburl"`
+	AddSubURL    string `toml:"addsuburl"`
+	ModSubURL    string `toml:"modsuburl"`
+	ReSubURL     string `toml:"resuburl"`
+	SubURL       string `toml:"suburl"`
+	PollMinutes  int64  `toml:"pollminutes"`
+	Password     string `toml:"password"`
+	Channel      string `toml:"channel"`
+	ChannelID    string `toml:"channelid"`
 }
 
 type AppConfig struct {
@@ -81,79 +83,63 @@ type AppConfig struct {
 	TwitchScrape `toml:"twitchscrape"`
 }
 
+type TwitchTokens struct {
+	AccessToken  string `toml:"accesstoken"`
+	RefreshToken string `toml:"refreshtoken"`
+}
+
 var settingsFile *string
-
-const sampleconf = `[website]
-addr=":80"
-basehost="www.destiny.gg"
-cdnhost="cdn.destiny.gg"
-privateapikey="keepitsecret"
-
-[debug]
-debug=false
-logfile="logs/debug.txt"
-
-[database]
-dsn="user:password@tcp(localhost:3306)/destinygg?loc=UTC&parseTime=true&strict=true&timeout=1s&time_zone='+00:00'"
-maxidleconnections=128
-maxconnections=256
-
-[redis]
-addr="localhost:6379"
-dbindex=0
-password=""
-poolsize=128
-
-[metrics]
-url="http://localhost:8083"
-username=""
-password=""
-
-[twitchscrape]
-# oauthtoken is used to request the subs from the twitch api and for the
-# password to the twitch irc server,
-# requires scopes: channel_subscriptions channel_check_subscription chat_login
-oauthtoken="generateone"
-clientid="generateone"
-getsuburl="http://127.0.0.1/api/twitchsubscriptions"
-addsuburl="http://127.0.0.1/api/addtwitchsubscription"
-modsuburl="http://127.0.0.1/api/twitchsubscriptions"
-resuburl="http://127.0.0.1/api/twitchresubscription"
-suburl="http://127.0.0.1/api/twitch/subscribe"
-# how many minutes between syncing the subs over
-pollminutes=60
-channel="destiny"
-channelid="18074328"
-`
+var tokensFile *string
 
 func Init(ctx context.Context) context.Context {
-	settingsFile = flag.String("config", "settings.cfg", `path to the config file, it it doesn't exist it will
-			be created with default values`)
+	settingsFile = flag.String("config", "settings.cfg", `path to the config file`)
+	tokensFile = flag.String("tokens", "twitchtokens", `path to the tokens file`)
 	flag.Parse()
+	cfg := ReadSettingsFile()
+	ReadTokensFile(&cfg.TwitchScrape, false)
+	return context.WithValue(ctx, "appconfig", cfg)
+}
 
-	f, err := os.OpenFile(*settingsFile, os.O_CREATE|os.O_RDWR, 0660)
+func ReadSettingsFile() *AppConfig {
+	f, err := os.OpenFile(*settingsFile, os.O_RDONLY, 0660)
+	defer f.Close()
 	if err != nil {
 		panic("Could not open " + *settingsFile + " err: " + err.Error())
 	}
-	defer f.Close()
-
-	// empty? initialize it
-	if info, err := f.Stat(); err == nil && info.Size() == 0 {
-		io.WriteString(f, sampleconf)
-		f.Seek(0, 0)
-	}
-
 	cfg := &AppConfig{}
 	if err := ReadConfig(f, cfg); err != nil {
 		panic("Failed to parse config file, err: " + err.Error())
 	}
+	return cfg
+}
 
-	return context.WithValue(ctx, "appconfig", cfg)
+func ReadTokensFile(cfg *TwitchScrape, overwrite bool) {
+	f, err := os.OpenFile(*tokensFile, os.O_CREATE|os.O_RDWR, 0660)
+	defer f.Close()
+	if err != nil {
+		panic("Could not open " + *tokensFile + " err: " + err.Error())
+	}
+	if info, err := f.Stat(); err == nil && (info.Size() == 0 || overwrite) {
+		var tokenStr string
+		tokenStr = "accesstoken=\""+ cfg.AccessToken +"\"\r\n"
+		tokenStr += "refreshtoken=\""+ cfg.RefreshToken +"\"\r\n"
+		if info.Size() > 0 {
+			f.Truncate(0)
+			f.Seek(0, 0)
+		}
+		io.WriteString(f, tokenStr)
+		f.Seek(0, 0)
+	}
+	tokens := &TwitchTokens{}
+	if err := ReadConfig(f, tokens); err != nil {
+		panic("Failed to parse config file, err: " + err.Error())
+	}
+	cfg.AccessToken = tokens.AccessToken
+	cfg.RefreshToken = tokens.RefreshToken
 }
 
 func ReadConfig(r io.Reader, d interface{}) error {
-	dec := toml.NewDecoder(r)
-	return dec.Decode(d)
+	return toml.NewDecoder(r).Decode(d)
 }
 
 func FromContext(ctx context.Context) *AppConfig {

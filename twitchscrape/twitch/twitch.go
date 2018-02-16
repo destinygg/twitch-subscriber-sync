@@ -38,10 +38,17 @@ type Twitch struct {
 	cfg     *config.TwitchScrape
 	apibase string
 }
+
 type User struct {
 	ID      string
 	Name    string
 	Created time.Time
+}
+
+type TokenStruct struct {
+	AccessToken string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Scope []string `json:"scope"`
 }
 
 var client = &http.Client{
@@ -57,7 +64,6 @@ func Init(ctx context.Context) context.Context {
 		cfg:     &config.FromContext(ctx).TwitchScrape,
 		apibase: "https://api.twitch.tv/kraken/",
 	}
-
 	return context.WithValue(ctx, "twitch", tw)
 }
 
@@ -113,11 +119,11 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	var users []User
 
 	// the starting url
-	urlStr := t.apibase + "channels/" + t.cfg.Channel + "/subscriptions?limit=100"
+	urlStr := t.apibase + "channels/" + t.cfg.ChannelID + "/subscriptions?limit=100"
 	// the request headers for reuse
 	headers := http.Header{
 		"Accept":        []string{"application/vnd.twitchtv.v5+json"},
-		"Authorization": []string{"OAuth " + t.cfg.OAuthToken},
+		"Authorization": []string{"OAuth " + t.cfg.AccessToken},
 		"Client-ID":     []string{t.cfg.ClientID},
 	}
 
@@ -148,8 +154,9 @@ func (t *Twitch) GetSubs() ([]User, error) {
 				d.DF(1, "temporary http error, retrying", urlStr)
 				continue
 			}
+		} else if res != nil && res.StatusCode == 401 {
+			return nil, t.Auth()
 		}
-
 		if err != nil || res == nil || (res != nil && res.StatusCode != 200) {
 			if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")
@@ -187,4 +194,51 @@ func (t *Twitch) GetSubs() ([]User, error) {
 
 		urlStr = js.Links.Next
 	}
+}
+
+func (t *Twitch) Auth() error {
+	d.DF(1, "renewing access token")
+	u, _ := url.Parse(t.apibase + "oauth2/token")
+	q := u.Query()
+	q.Add("grant_type", "refresh_token")
+	q.Add("refresh_token", t.cfg.RefreshToken)
+	q.Add("client_id", t.cfg.ClientID)
+	q.Add("client_secret", t.cfg.ClientSecret)
+	u.RawQuery = q.Encode()
+	headers := http.Header{"Accept": []string{"application/vnd.twitchtv.v5+json"}}
+	var res *http.Response
+	{
+		d.DF(1, "Calling %s", u)
+		res, err := client.Do(&http.Request{
+			Method:     "POST",
+			URL:        u,
+			Proto:      "HTTP/1.1",
+			ProtoMinor: 1,
+			Header:     headers,
+			Body:       nil,
+			Host:       u.Host,
+		})
+		if err != nil || res == nil || res.StatusCode != 200 {
+			if res != nil && res.StatusCode != 200 {
+				err = fmt.Errorf("non-200 statuscode received from twitch %v", res)
+			} else if err == nil {
+				err = fmt.Errorf("non-200 statuscode received from twitch")
+			}
+			d.P("Failed to GET the auth token, url, res, err", u, res, err)
+			return err
+		}
+		tokens := &TokenStruct{}
+		err = json.NewDecoder(res.Body).Decode(tokens)
+		res.Body.Close()
+		if err != nil {
+			d.P("Failed to decode twitch response %v", err)
+			return err
+		}
+		d.DF(1, "Updated OAuth Tokens")
+		t.cfg.RefreshToken = tokens.RefreshToken
+		t.cfg.AccessToken = tokens.AccessToken
+		config.ReadTokensFile(t.cfg, true)
+	}
+	d.DF(1, "Response %s", res)
+	return nil
 }
