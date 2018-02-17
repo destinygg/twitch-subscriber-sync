@@ -251,8 +251,8 @@ func (c *IConn) Read() (*Message, error) {
 	}
 	if m.Error == msgErrorBadAuth {
 		d.DF(1, "bad authentication %s", m)
-		err = c.Auth()
-		return nil, err
+		c.Auth()
+		return nil, fmt.Errorf("bad auth response")
 	}
 	d.DF(1, "<- %s", m)
 	return m, err

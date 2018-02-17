@@ -24,7 +24,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -74,46 +73,23 @@ func FromContext(ctx context.Context) *Twitch {
 }
 
 func (t *Twitch) GetSubs() ([]User, error) {
-	/*
-	  {
-	    "_total": 286,
-	    "subscriptions": [
-	      {
-	        "_id": "c4407b3d0b1d71ec6a2943950cc15e135d092391",
-	        "created_at": "2011-11-23T02:53:17Z",
-            "sub_plan": "1000",
-            "sub_plan_name": "Channel Subscription (mr_woodchuck)",
-	        "user": {
-				"_id": "89614178",
-				"bio": "Twitch staff member who is a heimerdinger main on the road to diamond.",
-				"created_at": "2015-04-26T18:45:34Z",
-				"display_name": "Mr_Woodchuck",
-				"logo": "https://static-cdn.jtvnw.net/jtv_user_pictures/mr_woodchuck-profile_image-a8b10154f47942bc-300x300.jpeg",
-				"name": "mr_woodchuck",
-				"type": "staff",
-				"updated_at": "2017-04-06T00:14:13Z"
-	        }
-	      }
-	    ]
-	  }
-	*/
+	// https://dev.twitch.tv/docs/v5/reference/channels#get-channel-subscribers
+	var users []User
 	var js struct {
 		Total int `json:"_total"`
 		Subs []struct {
 			Created string `json:"created_at"`
-			User    struct {
+			User struct {
 				Name string `json:"name"`
 				ID   string `json:"_id"`
 			} `json:"user"`
 		} `json:"subscriptions"`
 	}
-	var users []User
 
-	// the starting url
-	limit := 100
 	offset := 0
+	limit := 100
 	urlBase := t.apibase + "channels/" + t.cfg.ChannelID + "/subscriptions"
-	// the request headers for reuse
+
 	headers := http.Header{
 		"Accept":        []string{"application/vnd.twitchtv.v5+json"},
 		"Authorization": []string{"OAuth " + t.cfg.AccessToken},
@@ -121,7 +97,6 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	}
 
 	for {
-
 		urlStr := urlBase + "?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset)
 		offset += 100
 
@@ -146,15 +121,11 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
-		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-				d.DF(1, "temporary http error, retrying", urlStr)
-				continue
-			}
-		} else if res != nil && res.StatusCode == 401 {
-			return nil, t.Auth()
+		if res != nil && res.StatusCode == 401 {
+			t.Auth()
+			return nil, fmt.Errorf("bad auth response")
 		}
-		if err != nil || res == nil || (res != nil && res.StatusCode != 200) {
+		if err != nil || res == nil || res.StatusCode != 200 {
 			if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")
 			}
@@ -162,20 +133,18 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			return nil, err
 		}
 
-		dec := json.NewDecoder(res.Body)
-		err = dec.Decode(&js)
+		err = json.NewDecoder(res.Body).Decode(&js)
 		res.Body.Close()
 		if err != nil {
 			d.P("Failed to decode json, err", err)
 			return nil, err
 		}
-
 		if users == nil {
 			users = make([]User, 0, js.Total)
 		}
-
 		d.DF(1, "Successful response. Returned records [%v] Total users [%v]", len(js.Subs), len(users))
 
+		// return users when there are no more subs to retrieve.
 		if len(js.Subs) == 0 {
 			return users, nil
 		}

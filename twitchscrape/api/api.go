@@ -43,7 +43,6 @@ type Api struct {
 	mu sync.Mutex
 	// subs are keyed by ids that are alphanumeric but not necessarily only digits
 	subs       map[string]int
-	nicksToIDs map[string]string
 	client     http.Client
 }
 
@@ -51,7 +50,6 @@ func Init(ctx context.Context) context.Context {
 	api := &Api{
 		cfg:        config.FromContext(ctx),
 		subs:       map[string]int{},
-		nicksToIDs: map[string]string{},
 		client: http.Client{
 			Timeout: 5 * time.Second,
 			Transport: &http.Transport{
@@ -101,7 +99,7 @@ func (a *Api) call(method, url string, body io.Reader) ([]byte, error) {
 
 func (a *Api) getSubsLocked() error {
 	userids := struct {
-		Authids []string
+		Authids []string `json:"authids"`
 	}{}
 
 	data, err := a.call("GET", a.cfg.TwitchScrape.GetSubURL, nil)
@@ -120,22 +118,11 @@ func (a *Api) getSubsLocked() error {
 	return nil
 }
 
-func (a *Api) addNickLocked(nick, id string) {
-	a.nicksToIDs[strings.ToLower(nick)] = id
-}
-
-func (a *Api) nickToIDLocked(nick string) (string, bool) {
-	id, ok := a.nicksToIDs[strings.ToLower(nick)]
-	return id, ok
-}
-
 // separate url parameter so that we can differentiate between resubs and
 // fresh subs
 func (a Api) syncSubs(subs map[string]int, url string) error {
 	buf := &bytes.Buffer{}
-	enc := json.NewEncoder(buf)
-	_ = enc.Encode(subs)
-
+	json.NewEncoder(buf).Encode(subs)
 	_, err := a.call("POST", url, buf)
 	return err
 }
@@ -175,9 +162,7 @@ func (a *Api) syncFromTwitch(tw *twitch.Twitch) error {
 	visited := make(map[string]struct{}, len(users))
 
 	for _, u := range users {
-		a.addNickLocked(u.Name, u.ID)
 		visited[u.ID] = struct{}{}
-
 		wassub, ok := a.subs[u.ID]
 		if wassub != 1 && ok { // was not a sub before, but is now
 			a.subs[u.ID] = 1
@@ -193,7 +178,6 @@ func (a *Api) syncFromTwitch(tw *twitch.Twitch) error {
 		if _, ok := visited[id]; ok { // already seen, has to be a sub
 			continue
 		}
-
 		if wassub == 1 { // was a sub, but is no longer
 			a.subs[id] = 0
 			diff[id] = 0
