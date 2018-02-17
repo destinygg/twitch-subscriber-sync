@@ -32,6 +32,7 @@ import (
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
 	"golang.org/x/net/context"
+	"strconv"
 )
 
 type Twitch struct {
@@ -76,28 +77,21 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	/*
 	  {
 	    "_total": 286,
-	    "_links": {
-	      "self": "https://api.twitch.tv/kraken/channels/destiny/subscriptions?direction=ASC&limit=25&offset=0",
-	      "next": "https://api.twitch.tv/kraken/channels/destiny/subscriptions?direction=ASC&limit=25&offset=25"
-	    },
 	    "subscriptions": [
 	      {
-	        "created_at": "2011-11-23T02:53:17Z",
 	        "_id": "c4407b3d0b1d71ec6a2943950cc15e135d092391",
-	        "_links": {
-	          "self": "https://api.twitch.tv/kraken/channels/destiny/subscriptions/snowythedog"
-	        },
+	        "created_at": "2011-11-23T02:53:17Z",
+            "sub_plan": "1000",
+            "sub_plan_name": "Channel Subscription (mr_woodchuck)",
 	        "user": {
-	          "display_name": "Snowythedog",
-	          "_id": 22981482,
-	          "name": "snowythedog",
-	          "staff": false,
-	          "created_at": "2011-06-16T18:23:11Z",
-	          "updated_at": "2014-10-23T02:20:51Z",
-	          "logo": null,
-	          "_links": {
-	            "self": "https://api.twitch.tv/kraken/users/snowythedog"
-	          }
+				"_id": "89614178",
+				"bio": "Twitch staff member who is a heimerdinger main on the road to diamond.",
+				"created_at": "2015-04-26T18:45:34Z",
+				"display_name": "Mr_Woodchuck",
+				"logo": "https://static-cdn.jtvnw.net/jtv_user_pictures/mr_woodchuck-profile_image-a8b10154f47942bc-300x300.jpeg",
+				"name": "mr_woodchuck",
+				"type": "staff",
+				"updated_at": "2017-04-06T00:14:13Z"
 	        }
 	      }
 	    ]
@@ -105,21 +99,20 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	*/
 	var js struct {
 		Total int `json:"_total"`
-		Links struct {
-			Next string `json:"next"`
-		} `json:"_links"`
 		Subs []struct {
 			Created string `json:"created_at"`
 			User    struct {
 				Name string `json:"name"`
-				ID   int    `json:"_id"`
+				ID   string `json:"_id"`
 			} `json:"user"`
 		} `json:"subscriptions"`
 	}
 	var users []User
 
 	// the starting url
-	urlStr := t.apibase + "channels/" + t.cfg.ChannelID + "/subscriptions?limit=100"
+	limit := 100
+	offset := 0
+	urlBase := t.apibase + "channels/" + t.cfg.ChannelID + "/subscriptions"
 	// the request headers for reuse
 	headers := http.Header{
 		"Accept":        []string{"application/vnd.twitchtv.v5+json"},
@@ -128,6 +121,10 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	}
 
 	for {
+
+		urlStr := urlBase + "?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset)
+		offset += 100
+
 		var err error
 		var res *http.Response
 		{
@@ -192,7 +189,6 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
-		urlStr = js.Links.Next
 	}
 }
 
