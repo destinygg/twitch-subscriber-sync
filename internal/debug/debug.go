@@ -37,11 +37,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-const (
-	EnableDebug  = true
-	DisableDebug = false
-)
-
 var (
 	mu               sync.RWMutex
 	debuggingEnabled bool

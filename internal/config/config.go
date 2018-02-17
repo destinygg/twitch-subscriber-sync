@@ -64,9 +64,7 @@ type TwitchScrape struct {
 	AccessToken  string `toml:"accesstoken"`
 	RefreshToken string `toml:"refreshtoken"`
 	GetSubURL    string `toml:"getsuburl"`
-	AddSubURL    string `toml:"addsuburl"`
 	ModSubURL    string `toml:"modsuburl"`
-	ReSubURL     string `toml:"resuburl"`
 	SubURL       string `toml:"suburl"`
 	PollMinutes  int64  `toml:"pollminutes"`
 	Password     string `toml:"password"`

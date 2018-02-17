@@ -129,58 +129,6 @@ func (a *Api) nickToIDLocked(nick string) (string, bool) {
 	return id, ok
 }
 
-// ReSub is safe to call concurrently
-func (a *Api) ReSub(nick string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	var err error
-	if id, ok := a.nickToIDLocked(nick); ok {
-		d.DF(1, "Resubbing: %v (%v)", nick, id)
-		a.subs[id] = 1
-
-		s := map[string]int{id: 1}
-		err = a.syncSubs(s, a.cfg.TwitchScrape.ReSubURL)
-	} else {
-		d.DF(1, "Failed to resub: %v (not found on d.gg)", nick)
-	}
-
-	return err
-}
-
-// AddSub is safe to call concurrently
-func (a *Api) AddSub(nick string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	data := struct {
-		Nick string `json:"nick"`
-	}{Nick: nick}
-	buf := &bytes.Buffer{}
-	enc := json.NewEncoder(buf)
-	_ = enc.Encode(data)
-
-	res, err := a.call("POST", a.cfg.TwitchScrape.AddSubURL, buf)
-	if err != nil {
-		return err
-	}
-
-	resID := &struct {
-		ID string `json:"id"`
-	}{}
-	err = json.Unmarshal(res, resID)
-	if err != nil {
-		return err
-	}
-
-	if resID.ID != "" {
-		a.addNickLocked(nick, resID.ID)
-		a.subs[resID.ID] = 1
-	}
-
-	return err
-}
-
 // separate url parameter so that we can differentiate between resubs and
 // fresh subs
 func (a Api) syncSubs(subs map[string]int, url string) error {
