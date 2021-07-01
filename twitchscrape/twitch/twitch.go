@@ -63,7 +63,7 @@ var client = &http.Client{
 func Init(ctx context.Context) context.Context {
 	tw := &Twitch{
 		cfg:     &config.FromContext(ctx).TwitchScrape,
-		apibase: "https://api.twitch.tv/kraken/",
+		apibase: "https://api.twitch.tv/helix/",
 		authapibase: "https://id.twitch.tv/oauth2/",
 	}
 	return context.WithValue(ctx, "twitch", tw)
