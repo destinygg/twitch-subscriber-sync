@@ -1,0 +1,38 @@
+[website]
+addr = ""
+basehost = ""
+cdnhost = ""
+privateapikey = ""
+
+[debug]
+debug = 0
+login = ""
+
+[database]
+dsn = ""
+maxidleconnections = 0
+maxconnections = 0
+
+[redis]
+addr = ""
+password = ""
+dbindex = 0
+poolsize = 0
+
+[metrics]
+url = ""
+username = ""
+password = ""
+
+[twitchscrape]
+clientid = ""
+clientsecret = ""
+accesstoken = ""
+refreshtoken = ""
+getsuburl = ""
+modsuburl = ""
+suburl = ""
+pollminutes = 0
+password = ""
+channel = ""
+channelid = ""
