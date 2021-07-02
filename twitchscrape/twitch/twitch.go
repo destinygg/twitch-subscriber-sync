@@ -35,8 +35,9 @@ import (
 )
 
 type Twitch struct {
-	cfg     *config.TwitchScrape
-	apibase string
+	cfg         *config.TwitchScrape
+	apibase     string
+	authapibase string
 }
 
 type User struct {
@@ -63,6 +64,7 @@ func Init(ctx context.Context) context.Context {
 	tw := &Twitch{
 		cfg:     &config.FromContext(ctx).TwitchScrape,
 		apibase: "https://api.twitch.tv/kraken/",
+		authapibase: "https://id.twitch.tv/oauth2/",
 	}
 	return context.WithValue(ctx, "twitch", tw)
 }
@@ -163,14 +165,13 @@ func (t *Twitch) GetSubs() ([]User, error) {
 
 func (t *Twitch) Auth() error {
 	d.DF(1, "renewing access token")
-	u, _ := url.Parse(t.apibase + "oauth2/token")
+	u, _ := url.Parse(t.authapibase + "token")
 	q := u.Query()
 	q.Add("grant_type", "refresh_token")
 	q.Add("refresh_token", t.cfg.RefreshToken)
 	q.Add("client_id", t.cfg.ClientID)
 	q.Add("client_secret", t.cfg.ClientSecret)
 	u.RawQuery = q.Encode()
-	headers := http.Header{"Accept": []string{"application/vnd.twitchtv.v5+json"}}
 	var res *http.Response
 	{
 		d.DF(1, "Calling %s", u)
@@ -179,7 +180,7 @@ func (t *Twitch) Auth() error {
 			URL:        u,
 			Proto:      "HTTP/1.1",
 			ProtoMinor: 1,
-			Header:     headers,
+			Header:     nil,
 			Body:       nil,
 			Host:       u.Host,
 		})
