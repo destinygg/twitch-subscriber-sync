@@ -94,7 +94,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 	urlBase := t.apibase + "subscriptions"
 
 	headers := http.Header{
-		"Authorization": []string{"OAuth " + t.cfg.AccessToken},
+		"Authorization": []string{"Bearer " + t.cfg.AccessToken},
 		"Client-ID":     []string{t.cfg.ClientID},
 	}
 
