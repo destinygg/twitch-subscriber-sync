@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"io/ioutil"
 
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
@@ -122,6 +123,11 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
+		bodyBytes, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			d.DF(1, "%s - %s", res.Status, bodyBytes)
+		}
+
 		if res != nil && res.StatusCode == 401 {
 			t.Auth()
 			return nil, fmt.Errorf("bad auth response")
@@ -134,7 +140,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			return nil, err
 		}
 
-		err = json.NewDecoder(res.Body).Decode(&js)
+		err = json.Unmarshal(bodyBytes, &js)
 		res.Body.Close()
 		if err != nil {
 			d.P("Failed to decode json, err", err)
