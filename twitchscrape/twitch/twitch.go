@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"io/ioutil"
 
 	"github.com/destinygg/website2/internal/config"
 	"github.com/destinygg/website2/internal/debug"
@@ -35,14 +36,14 @@ import (
 )
 
 type Twitch struct {
-	cfg     *config.TwitchScrape
-	apibase string
+	cfg         *config.TwitchScrape
+	apibase     string
+	authapibase string
 }
 
 type User struct {
 	ID      string
 	Name    string
-	Created time.Time
 }
 
 type TokenStruct struct {
@@ -62,7 +63,8 @@ var client = &http.Client{
 func Init(ctx context.Context) context.Context {
 	tw := &Twitch{
 		cfg:     &config.FromContext(ctx).TwitchScrape,
-		apibase: "https://api.twitch.tv/kraken/",
+		apibase: "https://api.twitch.tv/helix/",
+		authapibase: "https://id.twitch.tv/oauth2/",
 	}
 	return context.WithValue(ctx, "twitch", tw)
 }
@@ -73,32 +75,32 @@ func FromContext(ctx context.Context) *Twitch {
 }
 
 func (t *Twitch) GetSubs() ([]User, error) {
-	// https://dev.twitch.tv/docs/v5/reference/channels#get-channel-subscribers
+	// https://dev.twitch.tv/docs/api/reference#get-broadcaster-subscriptions
 	var users []User
 	var js struct {
-		Total int `json:"_total"`
 		Subs []struct {
-			Created string `json:"created_at"`
-			User struct {
-				Name string `json:"name"`
-				ID   string `json:"_id"`
-			} `json:"user"`
-		} `json:"subscriptions"`
+			Name string `json:"user_login"`
+			ID   string `json:"user_id"`
+		} `json:"data"`
+
+		Pagination struct {
+			Cursor string `json:"cursor"`	
+		} `json:"pagination"`
+
+		Total int `json:"total"`
 	}
 
-	offset := 0
+	cursor := ""
 	limit := 100
-	urlBase := t.apibase + "channels/" + t.cfg.ChannelID + "/subscriptions"
+	urlBase := t.apibase + "subscriptions"
 
 	headers := http.Header{
-		"Accept":        []string{"application/vnd.twitchtv.v5+json"},
-		"Authorization": []string{"OAuth " + t.cfg.AccessToken},
+		"Authorization": []string{"Bearer " + t.cfg.AccessToken},
 		"Client-ID":     []string{t.cfg.ClientID},
 	}
 
 	for {
-		urlStr := urlBase + "?limit=" + strconv.Itoa(limit) + "&offset=" + strconv.Itoa(offset)
-		offset += 100
+		urlStr := urlBase + "?broadcaster_id=" + t.cfg.ChannelID + "&first=" + strconv.Itoa(limit) + "&after=" + cursor
 
 		var err error
 		var res *http.Response
@@ -121,6 +123,11 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			})
 		}
 
+		bodyBytes, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			d.DF(1, "%s - %s", res.Status, bodyBytes)
+		}
+
 		if res != nil && res.StatusCode == 401 {
 			t.Auth()
 			return nil, fmt.Errorf("bad auth response")
@@ -133,7 +140,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			return nil, err
 		}
 
-		err = json.NewDecoder(res.Body).Decode(&js)
+		err = json.Unmarshal(bodyBytes, &js)
 		res.Body.Close()
 		if err != nil {
 			d.P("Failed to decode json, err", err)
@@ -144,33 +151,31 @@ func (t *Twitch) GetSubs() ([]User, error) {
 		}
 		d.DF(1, "Successful response. Returned records [%v] Total users [%v]", len(js.Subs), len(users))
 
-		// return users when there are no more subs to retrieve.
-		if len(js.Subs) == 0 {
-			return users, nil
-		}
-
-		for _, s := range js.Subs {
-			t, _ := time.ParseInLocation("2006-01-02T15:04:05Z", s.Created, time.UTC)
+		for _, u := range js.Subs {
 			users = append(users, User{
-				ID:      fmt.Sprintf("%v", s.User.ID),
-				Name:    s.User.Name,
-				Created: t,
+				ID:      fmt.Sprintf("%v", u.ID),
+				Name:    u.Name,
 			})
 		}
 
+		cursor = js.Pagination.Cursor
+
+		// Finished when no subs are returned, which indicates the last page.
+		if len(js.Subs) == 0 {
+			return users, nil
+		}
 	}
 }
 
 func (t *Twitch) Auth() error {
 	d.DF(1, "renewing access token")
-	u, _ := url.Parse(t.apibase + "oauth2/token")
+	u, _ := url.Parse(t.authapibase + "token")
 	q := u.Query()
 	q.Add("grant_type", "refresh_token")
 	q.Add("refresh_token", t.cfg.RefreshToken)
 	q.Add("client_id", t.cfg.ClientID)
 	q.Add("client_secret", t.cfg.ClientSecret)
 	u.RawQuery = q.Encode()
-	headers := http.Header{"Accept": []string{"application/vnd.twitchtv.v5+json"}}
 	var res *http.Response
 	{
 		d.DF(1, "Calling %s", u)
@@ -179,7 +184,7 @@ func (t *Twitch) Auth() error {
 			URL:        u,
 			Proto:      "HTTP/1.1",
 			ProtoMinor: 1,
-			Header:     headers,
+			Header:     nil,
 			Body:       nil,
 			Host:       u.Host,
 		})
