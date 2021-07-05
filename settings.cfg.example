@@ -5,7 +5,7 @@ cdnhost = ""
 privateapikey = ""
 
 [debug]
-debug = 0
+debug = false
 login = ""
 
 [database]
