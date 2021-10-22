@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/destinygg/website2/internal/config"
+	"github.com/destinygg/twitch-subscriber-sync/internal/config"
 	"golang.org/x/net/context"
 )
 

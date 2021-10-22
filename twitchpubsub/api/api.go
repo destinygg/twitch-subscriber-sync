@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"time"
 	"crypto/tls"
-	"github.com/destinygg/website2/internal/debug"
-	"github.com/destinygg/website2/internal/config"
+	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
+	"github.com/destinygg/twitch-subscriber-sync/internal/config"
 	"golang.org/x/net/context"
 )
 

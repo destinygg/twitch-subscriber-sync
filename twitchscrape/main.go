@@ -21,10 +21,10 @@ package main
 
 import (
 	"time"
-	"github.com/destinygg/website2/internal/config"
-	"github.com/destinygg/website2/internal/debug"
-	"github.com/destinygg/website2/twitchscrape/api"
-	"github.com/destinygg/website2/twitchscrape/twitch"
+	"github.com/destinygg/twitch-subscriber-sync/internal/config"
+	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
+	"github.com/destinygg/twitch-subscriber-sync/twitchscrape/api"
+	"github.com/destinygg/twitch-subscriber-sync/twitchscrape/twitch"
 	"golang.org/x/net/context"
 )
 

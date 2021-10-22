@@ -29,8 +29,8 @@ import (
 	"time"
 	"io/ioutil"
 
-	"github.com/destinygg/website2/internal/config"
-	"github.com/destinygg/website2/internal/debug"
+	"github.com/destinygg/twitch-subscriber-sync/internal/config"
+	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
 	"golang.org/x/net/context"
 	"strconv"
 )
