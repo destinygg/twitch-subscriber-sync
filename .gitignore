@@ -8,3 +8,5 @@ precommit
 *.idea
 /twitchscrape/twitchtokens
 /twitchpubsub/twitchtokens
+.twitchtokens
+/logs

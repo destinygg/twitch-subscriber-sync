@@ -1,0 +1,24 @@
+version: '3.4'
+services:
+  twitch-scrape:
+    build:
+      context: .
+      dockerfile: ./twitchscrape/Dockerfile
+    container_name: twitch-scrape
+    volumes:
+      - ./settings.cfg:/app/settings.cfg:ro
+      - ./.twitchtokens:/app/.twitchtokens
+      - ./logs:/app/logs
+    restart: unless-stopped
+    network_mode: host
+  twitch-pubsub:
+    build:
+      context: .
+      dockerfile: ./twitchpubsub/Dockerfile
+    container_name: twitch-pubsub
+    volumes:
+      - ./settings.cfg:/app/settings.cfg:ro
+      - ./.twitchtokens:/app/.twitchtokens
+      - ./logs:/app/logs
+    restart: unless-stopped
+    network_mode: host

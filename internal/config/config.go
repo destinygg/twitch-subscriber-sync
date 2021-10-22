@@ -91,7 +91,7 @@ var tokensFile *string
 
 func Init(ctx context.Context) context.Context {
 	settingsFile = flag.String("config", "settings.cfg", `path to the config file`)
-	tokensFile = flag.String("tokens", "twitchtokens", `path to the tokens file`)
+	tokensFile = flag.String("tokens", ".twitchtokens", `path to the tokens file`)
 	flag.Parse()
 	cfg := ReadSettingsFile()
 	ReadTokensFile(&cfg.TwitchScrape, false)
