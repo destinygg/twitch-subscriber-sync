@@ -1,4 +1,4 @@
-module github.com/destinygg/website2
+module github.com/destinygg/twitch-subscriber-sync
 
 go 1.16
 
