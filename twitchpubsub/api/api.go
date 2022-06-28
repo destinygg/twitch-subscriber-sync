@@ -1,18 +1,19 @@
 package api
 
 import (
-	"io"
-	"net/http"
-	"io/ioutil"
-	"time"
 	"crypto/tls"
-	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"time"
+
 	"github.com/destinygg/twitch-subscriber-sync/internal/config"
+	d "github.com/destinygg/twitch-subscriber-sync/internal/debug"
 	"golang.org/x/net/context"
 )
 
 type Api struct {
-	cfg *config.AppConfig
+	cfg    *config.AppConfig
 	client http.Client
 }
 
@@ -22,7 +23,7 @@ func Init(ctx context.Context) context.Context {
 		client: http.Client{
 			Timeout: 5 * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{},
+				TLSClientConfig:       &tls.Config{},
 				ResponseHeaderTimeout: 5 * time.Second,
 			},
 		},
@@ -53,7 +54,7 @@ func (a *Api) call(method, url string, body io.Reader) ([]byte, error) {
 	}
 	defer res.Body.Close()
 
-	if err != nil || res.StatusCode < 200 || res.StatusCode >= 300 {
+	if err != nil || res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
 		data, _ := ioutil.ReadAll(res.Body)
 		d.PF(2, "Request failed: %#v, body was \n%v", err, string(data))
 		return nil, err

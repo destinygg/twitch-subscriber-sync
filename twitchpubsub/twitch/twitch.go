@@ -1,22 +1,23 @@
 package twitch
 
 import (
-	"time"
-	"github.com/gorilla/websocket"
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"math"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
-	"net/url"
-	"bytes"
-	"encoding/json"
-	"math"
 	"strings"
+	"time"
+
 	"github.com/destinygg/twitch-subscriber-sync/internal/config"
-	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
+	d "github.com/destinygg/twitch-subscriber-sync/internal/debug"
 	"github.com/destinygg/twitch-subscriber-sync/twitchpubsub/api"
+	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
-	"net/http"
-	"crypto/tls"
-	"fmt"
 )
 
 const (
@@ -71,9 +72,9 @@ type SubscribePayloadData struct {
 }
 
 type TokenStruct struct {
-	AccessToken string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	Scope []string `json:"scope"`
+	AccessToken  string   `json:"access_token"`
+	RefreshToken string   `json:"refresh_token"`
+	Scope        []string `json:"scope"`
 }
 
 var client = &http.Client{
@@ -206,8 +207,9 @@ func (c *IConn) Reconnect() {
 		Type: msgTypeListen,
 		Data: SubscribePayloadData{
 			AuthToken: c.cfg.AccessToken,
-			Topics: []string{msgEventPrefix + "." + c.cfg.ChannelID},
-		}}
+			Topics:    []string{msgEventPrefix + "." + c.cfg.ChannelID},
+		},
+	}
 
 	buf := &bytes.Buffer{}
 	json.NewEncoder(buf).Encode(m)
@@ -234,7 +236,7 @@ func (c *IConn) Read() (*Message, error) {
 	if err != nil {
 		if !c.closing {
 			// TODO we aren't getting a valid close status after sending the close frame to twitch
-			//if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure)
+			// if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure)
 			d.DF(1, "read error: %+v", err)
 			c.ReconnectAfterError(err)
 		}
@@ -280,8 +282,8 @@ func (c *IConn) Auth() error {
 			Body:       nil,
 			Host:       u.Host,
 		})
-		if err != nil || res == nil || res.StatusCode != 200 {
-			if res != nil && res.StatusCode != 200 {
+		if err != nil || res == nil || res.StatusCode != http.StatusOK {
+			if res != nil && res.StatusCode != http.StatusOK {
 				err = fmt.Errorf("non-200 statuscode received from twitch %v", res)
 			} else if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")

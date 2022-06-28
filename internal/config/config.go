@@ -21,10 +21,10 @@ package config
 
 import (
 	"flag"
-	"io"
-	"os"
 	"github.com/naoina/toml"
 	"golang.org/x/net/context"
+	"io"
+	"os"
 )
 
 type Website struct {
@@ -119,8 +119,8 @@ func ReadTokensFile(cfg *TwitchScrape, overwrite bool) {
 	}
 	if info, err := f.Stat(); err == nil && (info.Size() == 0 || overwrite) {
 		var tokenStr string
-		tokenStr = "accesstoken=\""+ cfg.AccessToken +"\"\r\n"
-		tokenStr += "refreshtoken=\""+ cfg.RefreshToken +"\"\r\n"
+		tokenStr = "accesstoken=\"" + cfg.AccessToken + "\"\r\n"
+		tokenStr += "refreshtoken=\"" + cfg.RefreshToken + "\"\r\n"
 		if info.Size() > 0 {
 			f.Truncate(0)
 			f.Seek(0, 0)

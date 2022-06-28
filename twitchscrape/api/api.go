@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/destinygg/twitch-subscriber-sync/internal/config"
-	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
+	d "github.com/destinygg/twitch-subscriber-sync/internal/debug"
 	"github.com/destinygg/twitch-subscriber-sync/twitchscrape/twitch"
 	"golang.org/x/net/context"
 )
@@ -41,14 +41,14 @@ type Api struct {
 
 	mu sync.Mutex
 	// subs are keyed by ids that are alphanumeric but not necessarily only digits
-	subs       map[string]int
-	client     http.Client
+	subs   map[string]int
+	client http.Client
 }
 
 func Init(ctx context.Context) context.Context {
 	api := &Api{
-		cfg:        config.FromContext(ctx),
-		subs:       map[string]int{},
+		cfg:  config.FromContext(ctx),
+		subs: map[string]int{},
 		client: http.Client{
 			Timeout: 5 * time.Second,
 			Transport: &http.Transport{
@@ -81,7 +81,7 @@ func (a *Api) call(method, url string, body io.Reader) ([]byte, error) {
 	}
 	defer res.Body.Close()
 
-	if err != nil || res.StatusCode < 200 || res.StatusCode >= 300 {
+	if err != nil || res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
 		data, _ := ioutil.ReadAll(res.Body)
 		d.PF(2, "Request failed: %#v, body was \n%v", err, string(data))
 		return nil, err

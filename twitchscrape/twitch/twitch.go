@@ -24,15 +24,15 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
-	"io/ioutil"
 
 	"github.com/destinygg/twitch-subscriber-sync/internal/config"
-	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
+	d "github.com/destinygg/twitch-subscriber-sync/internal/debug"
 	"golang.org/x/net/context"
-	"strconv"
 )
 
 type Twitch struct {
@@ -42,14 +42,14 @@ type Twitch struct {
 }
 
 type User struct {
-	ID      string
-	Name    string
+	ID   string
+	Name string
 }
 
 type TokenStruct struct {
-	AccessToken string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	Scope []string `json:"scope"`
+	AccessToken  string   `json:"access_token"`
+	RefreshToken string   `json:"refresh_token"`
+	Scope        []string `json:"scope"`
 }
 
 var client = &http.Client{
@@ -62,8 +62,8 @@ var client = &http.Client{
 
 func Init(ctx context.Context) context.Context {
 	tw := &Twitch{
-		cfg:     &config.FromContext(ctx).TwitchScrape,
-		apibase: "https://api.twitch.tv/helix/",
+		cfg:         &config.FromContext(ctx).TwitchScrape,
+		apibase:     "https://api.twitch.tv/helix/",
 		authapibase: "https://id.twitch.tv/oauth2/",
 	}
 	return context.WithValue(ctx, "twitch", tw)
@@ -84,7 +84,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 		} `json:"data"`
 
 		Pagination struct {
-			Cursor string `json:"cursor"`	
+			Cursor string `json:"cursor"`
 		} `json:"pagination"`
 
 		Total int `json:"total"`
@@ -110,7 +110,7 @@ func (t *Twitch) GetSubs() ([]User, error) {
 				d.P("could not parse url", urlStr)
 				return nil, err
 			}
-			d.DF(1,"Calling %s", u)
+			d.DF(1, "Calling %s", u)
 			res, err = client.Do(&http.Request{
 				Method:     "GET",
 				URL:        u,
@@ -128,11 +128,11 @@ func (t *Twitch) GetSubs() ([]User, error) {
 			d.DF(1, "%s - %s", res.Status, bodyBytes)
 		}
 
-		if res != nil && res.StatusCode == 401 {
+		if res != nil && res.StatusCode == http.StatusUnauthorized {
 			t.Auth()
 			return nil, fmt.Errorf("bad auth response")
 		}
-		if err != nil || res == nil || res.StatusCode != 200 {
+		if err != nil || res == nil || res.StatusCode != http.StatusOK {
 			if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")
 			}
@@ -153,8 +153,8 @@ func (t *Twitch) GetSubs() ([]User, error) {
 
 		for _, u := range js.Subs {
 			users = append(users, User{
-				ID:      fmt.Sprintf("%v", u.ID),
-				Name:    u.Name,
+				ID:   fmt.Sprintf("%v", u.ID),
+				Name: u.Name,
 			})
 		}
 
@@ -188,8 +188,8 @@ func (t *Twitch) Auth() error {
 			Body:       nil,
 			Host:       u.Host,
 		})
-		if err != nil || res == nil || res.StatusCode != 200 {
-			if res != nil && res.StatusCode != 200 {
+		if err != nil || res == nil || res.StatusCode != http.StatusOK {
+			if res != nil && res.StatusCode != http.StatusOK {
 				err = fmt.Errorf("non-200 statuscode received from twitch %v", res)
 			} else if err == nil {
 				err = fmt.Errorf("non-200 statuscode received from twitch")

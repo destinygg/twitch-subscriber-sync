@@ -20,12 +20,12 @@
 package main
 
 import (
-	"time"
 	"github.com/destinygg/twitch-subscriber-sync/internal/config"
 	"github.com/destinygg/twitch-subscriber-sync/internal/debug"
 	"github.com/destinygg/twitch-subscriber-sync/twitchscrape/api"
 	"github.com/destinygg/twitch-subscriber-sync/twitchscrape/twitch"
 	"golang.org/x/net/context"
+	"time"
 )
 
 func main() {
