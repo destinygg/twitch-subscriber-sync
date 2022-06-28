@@ -1,0 +1,9 @@
+version: '3.9'
+services:
+
+  twitchpubsub:
+    build: .
+
+  twitchscrape:
+    build: .
+    command: ["twitchscrape"]
